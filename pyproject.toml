@@ -1,0 +1,11 @@
+[project]
+name = "project_td_shooter"
+version = "0.1.0"
+description = "Top-down 3D Shooter built with Panda3D"
+requires-python = ">=3.10"
+dependencies = [
+    "panda3d>=1.10.0",
+]
+
+[tool.uv]
+dev-dependencies = []
