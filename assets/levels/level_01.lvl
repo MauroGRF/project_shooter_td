@@ -1,0 +1,12 @@
+# Level 01 - Test Map
+# W=wall, S=floor, D=door, P=player_spawn, E=enemy_spawn, C=chest
+W W W W W W W W W W
+W S S S S S S S S W
+W S P S S S S S S W
+W S S S S E S S S W
+W S S S S S S S S W
+W S S S W W S S S W
+W S S S W W S C S W
+W S S S S S S S S W
+W S S S S S S D S W
+W W W W W W W W W W

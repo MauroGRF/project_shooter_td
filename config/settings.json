@@ -1,0 +1,30 @@
+{
+    "window": {
+        "title": "TD Shooter",
+        "width": 1280,
+        "height": 720,
+        "fullscreen": false,
+        "BackgroundColor": [0.1, 0.1, 0.15, 1.0]
+    },
+    "game": {
+        "tile_size": 1.0,
+        "gravity": -20.0,
+        "player_speed": 5.0,
+        "player_life": 100,
+        "projectile_speed": 15.0,
+        "projectile_damage": 10,
+        "enemy_speed": 2.5,
+        "enemy_life": 30
+    },
+    "camera": {
+        "height": 15.0,
+        "angle": -60,
+        "near": 0.1,
+        "far": 1000.0,
+        "fov": 60
+    },
+    "audio": {
+        "music_volume": 0.7,
+        "sfx_volume": 0.8
+    }
+}
