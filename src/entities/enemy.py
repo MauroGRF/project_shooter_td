@@ -1,5 +1,6 @@
 from panda3d.core import CardMaker, Vec4
 from src.entities.character import Character
+from src.states.enemies.enemy_states import IdleState
 
 
 class Enemy(Character):
@@ -15,6 +16,14 @@ class Enemy(Character):
 
         self._add_marker()
 
+        self.state = IdleState(self)
+        self.state.enter()
+
+    def set_state(self, state):
+        """Transition the enemy AI to a new state (exit current, enter new)."""
+        self.state.exit()
+        self.state = state
+        state.enter()
     def _add_marker(self):
         cm = CardMaker("enemy_marker")
         cm.setFrame(-0.3, 0.3, -0.3, 0.3)
@@ -25,34 +34,4 @@ class Enemy(Character):
 
     def update(self, dt):
         Character.update(self, dt)
-        self._update_ai(dt)
-
-    def _update_ai(self, dt):
-        if self.game.state_machine.current_name != "gameplay":
-            return
-
-        gameplay = self.game.state_machine.get_state("gameplay")
-        if not gameplay or not gameplay.level or not gameplay.level.player:
-            return
-
-        player = gameplay.level.player
-        player_pos = player.get_position()
-        my_pos = self.get_position()
-
-        dx = player_pos[0] - my_pos[0]
-        dy = player_pos[1] - my_pos[1]
-        dist = (dx**2 + dy**2) ** 0.5
-
-        if dist > self.aggro_range:
-            return
-
-        if dist > 0:
-            nx = dx / dist
-            ny = dy / dist
-
-            if dist > self.attack_range:
-                self.move(nx, ny, dt, gameplay.level.tiles)
-            else:
-                self.shoot(gameplay.level)
-
-            self.aim(nx, ny)
+        self.state.update(dt)
