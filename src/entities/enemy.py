@@ -1,6 +1,6 @@
 from panda3d.core import CardMaker, Vec4
 from src.entities.character import Character
-from src.states.enemies.enemy_states import IdleState
+from src.states.enemies.enemy_states import ChaseState, IdleState, ShootState
 
 
 class Enemy(Character):
@@ -16,14 +16,28 @@ class Enemy(Character):
 
         self._add_marker()
 
-        self.state = IdleState(self)
-        self.state.enter()
+        # Available AI transitions for this enemy. Variations (turret, dog)
+        # change this dict; states themselves never change.
+        self.states = {
+            "idle": IdleState,
+            "chase": ChaseState,
+            "attack": ShootState,
+        }
+        self.state = None
+        self.set_state_by_name("idle")
 
     def set_state(self, state):
         """Transition the enemy AI to a new state (exit current, enter new)."""
-        self.state.exit()
+        if self.state:
+            self.state.exit()
         self.state = state
         state.enter()
+
+    def set_state_by_name(self, name):
+        """Transition by state name. Missing states are a no-op."""
+        state_class = self.states.get(name)
+        if state_class:
+            self.set_state(state_class(self))
     def _add_marker(self):
         cm = CardMaker("enemy_marker")
         cm.setFrame(-0.3, 0.3, -0.3, 0.3)

@@ -18,9 +18,9 @@ class IdleState(EnemyState):
         nx, ny, dist, level = context
         if dist <= self.enemy.aggro_range:
             if dist <= self.enemy.attack_range:
-                self.enemy.set_state(ShootState(self.enemy))
+                self.enemy.set_state_by_name("attack")
             else:
-                self.enemy.set_state(ChaseState(self.enemy))
+                self.enemy.set_state_by_name("chase")
 
 
 class ChaseState(EnemyState):
@@ -33,11 +33,11 @@ class ChaseState(EnemyState):
 
         nx, ny, dist, level = context
         if dist > self.enemy.aggro_range:
-            self.enemy.set_state(IdleState(self.enemy))
+            self.enemy.set_state_by_name("idle")
             return
 
         if dist <= self.enemy.attack_range:
-            self.enemy.set_state(ShootState(self.enemy))
+            self.enemy.set_state_by_name("attack")
             return
 
         self.enemy.move(nx, ny, dt, level.tiles)
@@ -54,7 +54,7 @@ class ShootState(EnemyState):
 
         nx, ny, dist, level = context
         if dist > self.enemy.attack_range:
-            self.enemy.set_state(ChaseState(self.enemy))
+            self.enemy.set_state_by_name("chase")
             return
 
         self.enemy.shoot(level)
