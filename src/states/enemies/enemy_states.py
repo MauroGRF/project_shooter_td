@@ -1,21 +1,21 @@
 """Concrete AI states for enemies.
 
-These states transition between each other, so they live in a single module
-to avoid circular imports: the state graph of an enemy is strongly connected
-(any state can reach any other).
+States transition by name via Enemy.set_state_by_name(), so they do not
+reference each other and can live in a single module without imports
+between them. The set of available states is chosen per enemy.
 """
 from src.states.enemies.enemy_state import EnemyState
 
 
 class IdleState(EnemyState):
-    """No line of sight to the player (or out of aggro range): do nothing."""
+    """Player out of aggro range: do nothing."""
 
     def update(self, dt):
         context = self._player_context()
         if not context:
             return
 
-        nx, ny, dist, level = context
+        dist = context[2]
         if dist <= self.enemy.aggro_range:
             if dist <= self.enemy.attack_range:
                 self.enemy.set_state_by_name("attack")

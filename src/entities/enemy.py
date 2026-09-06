@@ -38,6 +38,7 @@ class Enemy(Character):
         state_class = self.states.get(name)
         if state_class:
             self.set_state(state_class(self))
+
     def _add_marker(self):
         cm = CardMaker("enemy_marker")
         cm.setFrame(-0.3, 0.3, -0.3, 0.3)
