@@ -38,6 +38,15 @@ class Window:
         props.setTitle(self._config["title"])
         props.setSize(self._config["width"], self._config["height"])
         props.setFullscreen(self._config["fullscreen"])
+        # try to ensure the window is visible and in front on Windows
+        try:
+            props.setOrigin(100, 100)
+        except Exception:
+            pass
+        try:
+            props.setForeground(True)
+        except Exception:
+            pass
         self._base.win.requestProperties(props)
 
         bg = self._config["BackgroundColor"]

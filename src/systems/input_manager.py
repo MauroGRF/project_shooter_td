@@ -1,4 +1,5 @@
 from direct.showbase.ShowBase import ShowBase
+from panda3d.core import Point3, Vec3, Plane
 
 
 class InputManager:
@@ -15,31 +16,42 @@ class InputManager:
 
         self._setup_keybindings()
 
+    def _bind_key(self, key, event_names):
+        """Bind press/release for key state, including Panda3D modifier-prefixed
+        variants (e.g. while Shift is held, 'w' arrives as 'shift-w')."""
+        for name in event_names:
+            self.game.accept(name, self._set_key, [key, True])
+            self.game.accept(f"{name}-up", self._set_key, [key, False])
+
+    def _bind_action(self, event_names, action):
+        for name in event_names:
+            self.game.accept(name, self._on_action, [action])
+
     def _setup_keybindings(self):
-        self.game.accept("w", self._set_key, ["w", True])
-        self.game.accept("w-up", self._set_key, ["w", False])
-        self.game.accept("s", self._set_key, ["s", True])
-        self.game.accept("s-up", self._set_key, ["s", False])
-        self.game.accept("a", self._set_key, ["a", True])
-        self.game.accept("a-up", self._set_key, ["a", False])
-        self.game.accept("d", self._set_key, ["d", True])
-        self.game.accept("d-up", self._set_key, ["d", False])
+        self._bind_key("w", ["w", "shift-w"])
+        self._bind_key("s", ["s", "shift-s"])
+        self._bind_key("a", ["a", "shift-a"])
+        self._bind_key("d", ["d", "shift-d"])
 
-        self.game.accept("arrow_up", self._set_key, ["arrow_up", True])
-        self.game.accept("arrow_up-up", self._set_key, ["arrow_up", False])
-        self.game.accept("arrow_down", self._set_key, ["arrow_down", True])
-        self.game.accept("arrow_down-up", self._set_key, ["arrow_down", False])
-        self.game.accept("arrow_left", self._set_key, ["arrow_left", True])
-        self.game.accept("arrow_left-up", self._set_key, ["arrow_left", False])
-        self.game.accept("arrow_right", self._set_key, ["arrow_right", True])
-        self.game.accept("arrow_right-up", self._set_key, ["arrow_right", False])
+        self._bind_key("arrow_up", ["arrow_up", "shift-arrow_up"])
+        self._bind_key("arrow_down", ["arrow_down", "shift-arrow_down"])
+        self._bind_key("arrow_left", ["arrow_left", "shift-arrow_left"])
+        self._bind_key("arrow_right", ["arrow_right", "shift-arrow_right"])
 
-        self.game.accept("enter", self._on_action, ["enter_pressed"])
-        self.game.accept("escape", self._on_action, ["escape_pressed"])
-        self.game.accept("p", self._on_action, ["pause_pressed"])
+        self._bind_action(["enter", "shift-enter"], "enter_pressed")
+        self._bind_action(["escape", "shift-escape"], "escape_pressed")
+        self._bind_action(["p", "shift-p"], "pause_pressed")
 
-        self.game.accept("space", self._set_key, ["space", True])
-        self.game.accept("space-up", self._set_key, ["space", False])
+        self._bind_key("space", ["space", "shift-space"])
+
+        # mouse input
+        self.game.accept("mouse1", self._on_mouse1)
+
+    def _is_shift_down(self):
+        try:
+            return bool(self.game.getShift())
+        except Exception:
+            return False
 
     def _set_key(self, key, value):
         self.keys[key] = value
@@ -77,23 +89,53 @@ class InputManager:
         return (dx, dy)
 
     def update(self, dt):
-        if not self.player:
+        if self.game.state_machine.current_name != "gameplay":
+            return
+        if not self.player or not self.player.alive:
             return
 
         dx, dy = self.get_movement()
-        if dx != 0 or dy != 0:
-            length = (dx**2 + dy**2) ** 0.5
-            dx /= length
-            dy /= length
-            gameplay = self.game.state_machine.get_state("gameplay")
-            tiles = gameplay.level.tiles if gameplay and gameplay.level else []
-            self.player.move(dx, dy, dt, tiles)
+        sprint_intent = self._is_shift_down()
+        self.player.request_move(dx, dy, sprint_intent, dt)
 
+        # aiming (keyboard preferred only if no mouse), mouse preferred otherwise
         aim_dx, aim_dy = self.get_aim()
-        if aim_dx != 0 or aim_dy != 0:
-            self.player.aim(aim_dx, aim_dy)
+        try:
+            if self.game.mouseWatcherNode.hasMouse():
+                mpos = self.game.mouseWatcherNode.getMouse()
+                near = Point3()
+                far = Point3()
+                self.game.cam.node().getLens().extrude(mpos, near, far)
+                from_point = self.game.render.getRelativePoint(self.game.cam, near)
+                to_point = self.game.render.getRelativePoint(self.game.cam, far)
+                plane = Plane(Vec3(0, 0, 1), Point3(0, 0, 0))
+                intersect = Point3()
+                if plane.intersectsLine(intersect, from_point, to_point):
+                    world_x, world_y = intersect.getX(), intersect.getY()
+                    px, py, pz = self.player.get_position()
+                    vx = world_x - px
+                    vy = world_y - py
+                    dist = (vx * vx + vy * vy) ** 0.5
+                    if dist > 0.001:
+                        vx /= dist
+                        vy /= dist
+                        self.player.aim(vx, vy)
+            else:
+                if aim_dx != 0 or aim_dy != 0:
+                    self.player.aim(aim_dx, aim_dy)
+        except Exception:
+            pass
 
         if self.keys["space"]:
             gameplay = self.game.state_machine.get_state("gameplay")
             level = gameplay.level if gameplay else None
             self.player.shoot(level)
+
+    def _on_mouse1(self):
+        if self.game.state_machine.current_name != "gameplay":
+            return
+        if not self.player or not self.player.alive:
+            return
+        gameplay = self.game.state_machine.get_state("gameplay")
+        level = gameplay.level if gameplay else None
+        self.player.shoot(level)

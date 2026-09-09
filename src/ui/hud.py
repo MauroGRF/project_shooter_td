@@ -16,6 +16,16 @@ class HUD:
         )
         self.elements.append(self.life_label)
 
+        self.stamina_label = OnscreenText(
+            text="STA: 100",
+            pos=(-1.2, 0.82),
+            scale=0.045,
+            fg=(0.2, 1, 0.2, 1),
+            align=0,
+            mayChange=True,
+        )
+        self.elements.append(self.stamina_label)
+
         self.score_label = OnscreenText(
             text="SCORE: 0",
             pos=(0, 0.9),
@@ -52,6 +62,8 @@ class HUD:
         player = gameplay.level.player
         if player:
             self.life_label.setText(f"HP: {int(player.life)}")
+            if hasattr(player, 'stamina'):
+                self.stamina_label.setText(f"STA: {int(player.stamina)}")
 
     def destroy(self):
         for elem in self.elements:

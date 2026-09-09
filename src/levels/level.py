@@ -1,6 +1,6 @@
 from src.entities.tile import Tile
 from src.entities.player import Player
-from src.entities.enemy import Dog, Enemy
+from src.entities.enemy import Enemy
 from src.systems.physics import Physics
 from src.systems.collision import CollisionSystem
 from src.systems.animation_system import AnimationSystem
@@ -68,16 +68,6 @@ class Level:
             enemy.node.reparentTo(self.root)
             self.entities.append(enemy)
 
-        for spawn in self.data["dog_spawns"]:
-            dog = Dog(
-                self.game,
-                model_name=model_name,
-                grid_pos=spawn,
-                tile_size=self.tile_size,
-            )
-            dog.node.reparentTo(self.root)
-            self.entities.append(dog)
-
     def _setup_camera(self):
         width = self.data["width"] * self.tile_size
         height = self.data["height"] * self.tile_size
@@ -100,6 +90,9 @@ class Level:
             entity.update(dt)
             if entity.is_dead():
                 self.remove_entity(entity)
+                # player death changes state (destroys this level): stop iterating
+                if self.game.state_machine.current_name != "gameplay":
+                    break
 
     def add_projectile(self, projectile):
         projectile.node.reparentTo(self.root)
@@ -112,6 +105,8 @@ class Level:
 
     def remove_entity(self, entity):
         if entity == self.player:
+            entity.destroy()
+            self.player = None
             self.game.state_machine.change_state("menu")
             return
         if entity in self.entities:

@@ -29,18 +29,60 @@ class Character(EntityBase):
     def move(self, dx, dy, dt, tiles=None):
         if not self.alive:
             return
-
+        # old move preserved: interpret dx,dy as direction and move by speed*dt
         pos = self.node.getPos()
-        new_x = pos.getX() + dx * self.speed * dt
-        new_y = pos.getY() + dy * self.speed * dt
+        speed = self.get_move_speed()
+        disp_x = dx * speed * dt
+        disp_y = dy * speed * dt
+        self.move_by(disp_x, disp_y, tiles)
 
-        if tiles:
-            if self._is_walkable(new_x, pos.getY(), tiles):
-                self.node.setX(new_x)
-            if self._is_walkable(self.node.getX(), new_y, tiles):
-                self.node.setY(new_y)
-        else:
-            self.node.setPos(new_x, new_y, pos.getZ())
+    def get_move_speed(self):
+        factor = getattr(self, 'move_speed_factor', 1.0)
+        return self.speed * factor
+
+    def move_by(self, disp_x, disp_y, tiles=None):
+        """Move the entity by world displacement (units). Handles substeps and sliding.
+
+        disp_x, disp_y: world-space displacement in X/Y to apply for this update.
+        """
+        if not self.alive:
+            return
+        pos = self.node.getPos()
+
+        # split movement into substeps to avoid tunneling and improve collision sliding
+        max_step = max(self.tile_size * 0.25, 0.05)
+        steps = 1
+        max_disp = max(abs(disp_x), abs(disp_y))
+        if max_disp > max_step:
+            steps = int((max_disp // max_step) + 1)
+
+        step_x = disp_x / steps
+        step_y = disp_y / steps
+
+        for i in range(steps):
+            cur_x = self.node.getX()
+            cur_y = self.node.getY()
+            nx = cur_x + step_x
+            ny = cur_y + step_y
+            if tiles:
+                moved_x = False
+                moved_y = False
+                if self._is_walkable(nx, cur_y, tiles):
+                    self.node.setX(nx)
+                    moved_x = True
+                if self._is_walkable(self.node.getX(), ny, tiles):
+                    self.node.setY(ny)
+                    moved_y = True
+                # sliding: if blocked on both axes, try smaller step towards target
+                if not moved_x and not moved_y:
+                    nx2 = cur_x + step_x * 0.5
+                    ny2 = cur_y + step_y * 0.5
+                    if self._is_walkable(nx2, cur_y, tiles):
+                        self.node.setX(nx2)
+                    if self._is_walkable(self.node.getX(), ny2, tiles):
+                        self.node.setY(ny2)
+            else:
+                self.node.setPos(nx, ny, pos.getZ())
 
         self.grid_x = int(round(self.node.getX() / self.tile_size))
         self.grid_y = int(round(self.node.getY() / self.tile_size))
