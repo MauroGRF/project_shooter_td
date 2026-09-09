@@ -1,6 +1,6 @@
 from src.entities.tile import Tile
 from src.entities.player import Player
-from src.entities.enemy import Enemy
+from src.entities.enemy import Dog, Enemy
 from src.systems.physics import Physics
 from src.systems.collision import CollisionSystem
 from src.systems.animation_system import AnimationSystem
@@ -67,6 +67,16 @@ class Level:
             )
             enemy.node.reparentTo(self.root)
             self.entities.append(enemy)
+
+        for spawn in self.data["dog_spawns"]:
+            dog = Dog(
+                self.game,
+                model_name=model_name,
+                grid_pos=spawn,
+                tile_size=self.tile_size,
+            )
+            dog.node.reparentTo(self.root)
+            self.entities.append(dog)
 
     def _setup_camera(self):
         width = self.data["width"] * self.tile_size

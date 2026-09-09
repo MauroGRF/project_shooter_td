@@ -1,0 +1,8 @@
+# Test level - dog only
+# W=wall, S=floor, D=door, P=player_spawn, E=enemy_spawn, F=dog_spawn, C=chest
+# Small open arena: dog across from the player, no obstacles, clean chase test.
+W W W W W W W W W W
+W S S S S S S S S W
+W S P S S S S F S W
+W S S S S S S S S W
+W W W W W W W W W W

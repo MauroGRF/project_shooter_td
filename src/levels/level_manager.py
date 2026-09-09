@@ -7,6 +7,7 @@ TILE_CHARS = {
     "D": "door",
     "P": "spawn_player",
     "E": "spawn_enemy",
+    "F": "spawn_dog",
     "C": "chest",
 }
 
@@ -49,6 +50,7 @@ class LevelManager:
         tiles = []
         player_spawn = None
         enemy_spawns = []
+        dog_spawns = []
 
         for row_idx, row in enumerate(grid):
             tile_row = []
@@ -68,6 +70,8 @@ class LevelManager:
                     player_spawn = (col_idx, row_idx)
                 elif cell == "E":
                     enemy_spawns.append((col_idx, row_idx))
+                elif cell == "F":
+                    dog_spawns.append((col_idx, row_idx))
 
             tiles.append(tile_row)
 
@@ -77,4 +81,5 @@ class LevelManager:
             "tiles": tiles,
             "player_spawn": player_spawn,
             "enemy_spawns": enemy_spawns,
+            "dog_spawns": dog_spawns,
         }

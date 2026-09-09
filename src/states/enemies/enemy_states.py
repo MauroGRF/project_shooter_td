@@ -59,3 +59,35 @@ class ShootState(EnemyState):
 
         self.enemy.shoot(level)
         self.enemy.aim(nx, ny)
+
+
+class MeleeAttackState(EnemyState):
+    """Player inside attack range: bite on a cooldown timer.
+
+    Damage comes from state logic (distance via _player_context), not from
+    the contact system: entity_enter fires once per contact episode, which
+    would let a permanently-attached dog bite only once. The FSM owns the
+    decision to bite; the contact tracking stays available for other uses.
+    """
+
+    def enter(self):
+        self._cooldown = 0.0
+
+    def update(self, dt):
+        context = self._player_context()
+        if not context:
+            return
+
+        nx, ny, dist, level = context
+        if dist > self.enemy.attack_range:
+            self.enemy.set_state_by_name("chase")
+            return
+
+        self.enemy.aim(nx, ny)
+
+        self._cooldown -= dt
+        if self._cooldown > 0:
+            return
+
+        self._cooldown = self.enemy.attack_cooldown
+        level.player.take_damage(self.enemy.melee_damage)

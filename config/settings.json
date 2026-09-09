@@ -14,7 +14,13 @@
         "projectile_speed": 15.0,
         "projectile_damage": 10,
         "enemy_speed": 2.5,
-        "enemy_life": 30
+        "enemy_life": 30,
+        "dog_speed": 3.0,
+        "dog_life": 15,
+        "dog_damage": 10,
+        "dog_attack_cooldown": 1.0,
+        "dog_attack_range": 0.8,
+        "dog_aggro_range": 3.0
     },
     "camera": {
         "height": 15.0,
