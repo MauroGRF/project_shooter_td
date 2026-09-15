@@ -28,6 +28,19 @@ class Projectile(EntityBase):
             color = Vec4(1.0, 0.3, 0.0, 1.0)
         bullet.setColor(color)
         bullet.setP(-90)
+        self.bullet_card = bullet
+
+    def reflect(self, new_owner):
+        """Bounce the projectile back; from now on it belongs to new_owner."""
+        if not self.alive:
+            return
+        self.owner = new_owner
+        self.direction = -self.direction
+        self.age = 0.0
+        self.node.setX(self.node.getX() + self.direction.getX() * 0.4)
+        self.node.setY(self.node.getY() + self.direction.getY() * 0.4)
+        if self.bullet_card:
+            self.bullet_card.setColor(Vec4(0.2, 1.0, 1.0, 1.0))
 
     def update(self, dt):
         if not self.alive:

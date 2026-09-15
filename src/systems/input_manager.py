@@ -12,9 +12,20 @@ class InputManager:
             "arrow_up": False, "arrow_down": False,
             "arrow_left": False, "arrow_right": False,
             "space": False,
+            "mouse1": False,
         }
 
         self._setup_keybindings()
+
+    def _key_event_names(self, base):
+        """All event names a key can arrive as, depending on held modifiers
+        (Shift and Ctrl prefix the event name in Panda3D)."""
+        return [
+            base,
+            f"shift-{base}",
+            f"control-{base}",
+            f"shift-control-{base}",
+        ]
 
     def _bind_key(self, key, event_names):
         """Bind press/release for key state, including Panda3D modifier-prefixed
@@ -27,29 +38,64 @@ class InputManager:
         for name in event_names:
             self.game.accept(name, self._on_action, [action])
 
-    def _setup_keybindings(self):
-        self._bind_key("w", ["w", "shift-w"])
-        self._bind_key("s", ["s", "shift-s"])
-        self._bind_key("a", ["a", "shift-a"])
-        self._bind_key("d", ["d", "shift-d"])
+    def _bind_dash(self, event_names):
+        for name in event_names:
+            self.game.accept(name, self._on_dash)
 
-        self._bind_key("arrow_up", ["arrow_up", "shift-arrow_up"])
-        self._bind_key("arrow_down", ["arrow_down", "shift-arrow_down"])
-        self._bind_key("arrow_left", ["arrow_left", "shift-arrow_left"])
-        self._bind_key("arrow_right", ["arrow_right", "shift-arrow_right"])
+    def _bind_weapon(self, event_names, weapon_key):
+        for name in event_names:
+            self.game.accept(name, self._on_weapon_select, [weapon_key])
+
+    def _bind_ammo_toggle(self, event_names):
+        for name in event_names:
+            self.game.accept(name, self._on_toggle_ammo_mode)
+
+    def _bind_effect(self, effect_name, event_names):
+        for name in event_names:
+            self.game.accept(name, self._on_apply_effect, [effect_name])
+
+    def _setup_keybindings(self):
+        self._bind_key("w", self._key_event_names("w"))
+        self._bind_key("s", self._key_event_names("s"))
+        self._bind_key("a", self._key_event_names("a"))
+        self._bind_key("d", self._key_event_names("d"))
+
+        self._bind_key("arrow_up", self._key_event_names("arrow_up"))
+        self._bind_key("arrow_down", self._key_event_names("arrow_down"))
+        self._bind_key("arrow_left", self._key_event_names("arrow_left"))
+        self._bind_key("arrow_right", self._key_event_names("arrow_right"))
 
         self._bind_action(["enter", "shift-enter"], "enter_pressed")
         self._bind_action(["escape", "shift-escape"], "escape_pressed")
         self._bind_action(["p", "shift-p"], "pause_pressed")
 
-        self._bind_key("space", ["space", "shift-space"])
+        self._bind_key("space", self._key_event_names("space"))
 
-        # mouse input
-        self.game.accept("mouse1", self._on_mouse1)
+        # mouse input (hold-to-fire; modifiers prefix mouse events too)
+        self._bind_key("mouse1", self._key_event_names("mouse1"))
+
+        # dash action
+        self._bind_dash(["z", "shift-z", "control-z", "shift-control-z"])
+
+        # ammo mode toggle (limited / infinite)
+        self._bind_ammo_toggle(["l", "shift-l", "control-l", "shift-control-l"])
+
+        # status effect test keys
+        self._bind_effect("speed", ["m", "shift-m", "control-m", "shift-control-m"])
+
+        # weapon selection (0 = melee, 1 = pistol, 2 = rifle, 3 = shotgun)
+        for key in ["0", "1", "2", "3"]:
+            self._bind_weapon(self._key_event_names(key), key)
 
     def _is_shift_down(self):
         try:
             return bool(self.game.getShift())
+        except Exception:
+            return False
+
+    def _is_control_down(self):
+        try:
+            return bool(self.game.getControl())
         except Exception:
             return False
 
@@ -58,6 +104,34 @@ class InputManager:
 
     def _on_action(self, event_name):
         self.game.event_bus.emit(event_name)
+
+    def _on_dash(self):
+        if self.game.state_machine.current_name != "gameplay":
+            return
+        if not self.player or not self.player.alive:
+            return
+        self.player.request_dash()
+
+    def _on_weapon_select(self, weapon_key):
+        if self.game.state_machine.current_name != "gameplay":
+            return
+        if not self.player or not self.player.alive:
+            return
+        self.player.select_weapon(weapon_key)
+
+    def _on_toggle_ammo_mode(self):
+        if self.game.state_machine.current_name != "gameplay":
+            return
+        if not self.player or not self.player.alive:
+            return
+        self.player.toggle_ammo_mode()
+
+    def _on_apply_effect(self, effect_name):
+        if self.game.state_machine.current_name != "gameplay":
+            return
+        if not self.player or not self.player.alive:
+            return
+        self.player.apply_status(effect_name)
 
     def bind_player(self, player):
         self.player = player
@@ -98,6 +172,12 @@ class InputManager:
         sprint_intent = self._is_shift_down()
         self.player.request_move(dx, dy, sprint_intent, dt)
 
+        # parry: edge-detect the Ctrl key (polled to avoid modifier-prefix issues)
+        control_down = self._is_control_down()
+        if control_down and not self._was_control_down:
+            self.player.request_parry()
+        self._was_control_down = control_down
+
         # aiming (keyboard preferred only if no mouse), mouse preferred otherwise
         aim_dx, aim_dy = self.get_aim()
         try:
@@ -126,16 +206,7 @@ class InputManager:
         except Exception:
             pass
 
-        if self.keys["space"]:
+        if self.keys["space"] or self.keys["mouse1"]:
             gameplay = self.game.state_machine.get_state("gameplay")
             level = gameplay.level if gameplay else None
             self.player.shoot(level)
-
-    def _on_mouse1(self):
-        if self.game.state_machine.current_name != "gameplay":
-            return
-        if not self.player or not self.player.alive:
-            return
-        gameplay = self.game.state_machine.get_state("gameplay")
-        level = gameplay.level if gameplay else None
-        self.player.shoot(level)

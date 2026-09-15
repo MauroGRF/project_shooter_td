@@ -16,6 +16,7 @@ class Level:
         self.tiles = []
         self.entities = []
         self.projectiles = []
+        self.melee_hitboxes = []
         self.player = None
 
         self.physics = Physics(game)
@@ -77,7 +78,7 @@ class Level:
 
     def update(self, dt):
         self.physics.update(dt, self.entities + self.projectiles, self.tiles)
-        self.collision.update(self.entities, self.projectiles, self.tiles)
+        self.collision.update(dt, self.entities, self.projectiles, self.tiles, self.melee_hitboxes)
         self.animation.update(dt)
         self.camera.update(dt)
 
@@ -94,9 +95,23 @@ class Level:
                 if self.game.state_machine.current_name != "gameplay":
                     break
 
+        for hb in self.melee_hitboxes[:]:
+            hb.update(dt)
+            if not hb.alive:
+                self.remove_melee_hitbox(hb)
+
     def add_projectile(self, projectile):
         projectile.node.reparentTo(self.root)
         self.projectiles.append(projectile)
+
+    def add_melee_hitbox(self, hitbox):
+        hitbox.node.reparentTo(self.root)
+        self.melee_hitboxes.append(hitbox)
+
+    def remove_melee_hitbox(self, hitbox):
+        if hitbox in self.melee_hitboxes:
+            self.melee_hitboxes.remove(hitbox)
+            hitbox.destroy()
 
     def remove_projectile(self, projectile):
         if projectile in self.projectiles:
@@ -118,9 +133,12 @@ class Level:
             entity.destroy()
         for projectile in self.projectiles:
             projectile.destroy()
+        for hb in self.melee_hitboxes:
+            hb.destroy()
         for tile in self.tiles:
             tile.destroy()
         self.entities.clear()
         self.projectiles.clear()
+        self.melee_hitboxes.clear()
         self.tiles.clear()
         self.root.removeNode()
