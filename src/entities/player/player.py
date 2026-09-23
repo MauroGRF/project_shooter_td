@@ -79,6 +79,10 @@ class Player(Character):
         # status effects (speed multiplier etc.)
         self.status_effects = StatusEffectSystem(game)
 
+        # pickup economy
+        self.coins = 0
+        self.score = 0
+
         self._add_marker()
 
     def _add_marker(self, marker_height=None):
@@ -189,6 +193,21 @@ class Player(Character):
         for key, weapon in self.weapons.items():
             if weapon.get("type") != "melee":
                 self.weapon_ammo[key] = weapon.get("ammo", 999)
+
+    def add_coin(self, n=1):
+        self.coins += n
+
+    def add_score(self, n=1):
+        self.score += n
+
+    def reload_weapon(self, key=None):
+        if key is None:
+            self._refill_ammo()
+            return
+        weapon = self.weapons.get(key)
+        if not weapon or weapon.get("type") == "melee":
+            return
+        self.weapon_ammo[key] = weapon.get("ammo", 999)
 
     def get_effective_speed(self):
         return self.speed * self.status_effects.get_modifier("speed_multiplier")

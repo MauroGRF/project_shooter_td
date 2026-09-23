@@ -10,6 +10,7 @@ TILE_COLORS = {
     "floor": (0.3, 0.35, 0.25, 1.0),
     "door": (0.7, 0.6, 0.25, 1.0),
     "chest": (0.9, 0.75, 0.15, 1.0),
+    "barrier": (0.2, 0.2, 0.25, 1.0),
 }
 
 TILE_TEXTURES = {
@@ -134,7 +135,7 @@ class Tile(EntityBase):
         cache = TileTextureCache.get_instance()
         self.texture = cache.get_texture(self.entity_type, self.game)
 
-        if self.entity_type == "wall":
+        if self.entity_type in ("wall", "barrier"):
             return self._create_wall_visual(vis, s, color)
 
         return self._create_floor_visual(vis, s, color)

@@ -137,6 +137,16 @@ W W W W W W W W W W
 | `F` | spawn_dog | Si | Posicion de dogs (no genera tile) |
 | `D` | door | Si | Puerta (transicion entre areas) |
 | `C` | chest | No | Cofre interactuable |
+| `B` | barrier | No | Barrera solida; se elimina con el evento `clear_barriers` |
+| `o` | coin | Si | Collectable: +1 moneda al contacto |
+| `m` | score | Si | Collectable: +monedas y +puntaje |
+| `g` | weapon | Si | Collectable: recarga arma (o la cambia en modo select) |
+| `x` | exit | Si | Collectable: termina el nivel |
+| `t` | trigger | Si | Collectable: dispara `clear_barriers` |
+| `n` | next_level | Si | Collectable: dispara `change_level` hacia `# next_level: file.lvl` |
+
+**Metadatos por comentario** (lineas `# clave: valor`):
+- `# next_level: level_02.lvl` — destino del collectable `n`
 
 **Logica de colision por tiles:**
 - `LevelManager` calcula la posicion world-space de cada tile: `(grid_x * tile_size, grid_y * tile_size)`
@@ -151,16 +161,22 @@ W W W W W W W W W W
 | `character.py` | Hereda de `EntityBase`. Movimiento con colisión AABB por caja, aim, shoot base. |
 | `player/player.py` | Stamina, sprint, dash, parry, 4 armas, melee trail, status effects. |
 | `enemies/enemy.py` | Enemy (ranged) y Dog (melee). AI data-driven vía dict de states. |
-| `tile.py` | Tile estático: wall = box `tile_box.glb`; floor/door/chest = card plana con textura `TileTextureCache`. |
+| `tile.py` | Tile estático: wall/barrier = box `tile_box.glb`; floor/door/chest = card plana con textura `TileTextureCache`. |
 | `projectile.py` | Proyectil con speed/damage opcionales por constructor (default = config). |
 | `melee_hitbox.py` | Hitbox temporal del swing melee. |
+| `collectables/` | `Collectable` + subclases (score, weapon, exit, event). Al tocar al player: +moneda y efecto extra. |
 
-**Jerarquía:**
+**Jerarquía de entidades:**
 ```
 EntityBase
   ├── Character
   │     ├── Player
   │     └── Enemy → Dog
+  ├── Collectable
+  │     ├── ScoreBonus
+  │     ├── WeaponPickup
+  │     ├── LevelExit
+  │     └── EventTrigger
   ├── Tile
   ├── Projectile
   └── MeleeHitbox

@@ -18,6 +18,7 @@ class GameplayState(StateBase):
             if self.hud:
                 self.hud.show()
             self.game.event_bus.subscribe("pause_pressed", self._on_pause)
+            self._subscribe_level_events()
             return
 
         if level_data is None:
@@ -33,6 +34,7 @@ class GameplayState(StateBase):
         self.hud.show()
 
         self.game.event_bus.subscribe("pause_pressed", self._on_pause)
+        self._subscribe_level_events()
 
     def exit(self):
         if self._preserve_for_pause:
@@ -55,6 +57,7 @@ class GameplayState(StateBase):
             self.hud.destroy()
             self.hud = None
         self.game.event_bus.unsubscribe("pause_pressed", self._on_pause)
+        self._unsubscribe_level_events()
 
     def update(self, dt):
         if self.level:
@@ -65,3 +68,34 @@ class GameplayState(StateBase):
     def _on_pause(self):
         self._preserve_for_pause = True
         self.game.state_machine.change_state("pause")
+
+    def _subscribe_level_events(self):
+        self.game.event_bus.subscribe("level_complete", self._on_level_complete)
+        self.game.event_bus.subscribe("change_level", self._on_change_level)
+
+    def _unsubscribe_level_events(self):
+        self.game.event_bus.unsubscribe("level_complete", self._on_level_complete)
+        self.game.event_bus.unsubscribe("change_level", self._on_change_level)
+
+    def _leave_to(self, name, **kwargs):
+        self._preserve_for_pause = False
+        self.game.state_machine.change_state(name, **kwargs)
+
+    def _on_level_complete(self, *args):
+        next_level = args[0] if args else None
+        if isinstance(next_level, (list, tuple)):
+            next_level = next_level[0] if next_level else None
+        if next_level:
+            self._leave_to("loading", level_file=next_level)
+        else:
+            self._leave_to("menu")
+
+    def _on_change_level(self, *args):
+        payload = args[0] if args else None
+        if isinstance(payload, (list, tuple)):
+            payload = payload[0] if payload else None
+        level = payload.get("level") if isinstance(payload, dict) else None
+        if level:
+            self._leave_to("loading", level_file=level)
+        else:
+            self._leave_to("menu")

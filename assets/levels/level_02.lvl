@@ -1,0 +1,6 @@
+# Level 02 - Stub (reached via n collectable in level_01)
+# W=wall, S=floor, P=player_spawn, x=exit
+W W W W W
+W P S S W
+W S S x W
+W W W W W

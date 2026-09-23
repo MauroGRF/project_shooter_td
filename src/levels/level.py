@@ -1,6 +1,7 @@
 from src.entities.tile import Tile
 from src.entities.player import Player
 from src.entities.enemies import Dog, Enemy
+from src.entities.collectables import create_collectable
 from src.systems.physics import Physics
 from src.systems.collision import CollisionSystem
 from src.systems.animation_system import AnimationSystem
@@ -14,6 +15,7 @@ class Level:
         self.tile_size = game.settings.get("game.tile_size", 1.0)
 
         self.tiles = []
+        self.barriers = []
         self.entities = []
         self.projectiles = []
         self.melee_hitboxes = []
@@ -25,11 +27,13 @@ class Level:
         self.camera = CameraSystem(game)
 
         self.root = self.game.render.attachNewNode("level_root")
+        self.game.event_bus.subscribe("clear_barriers", self._on_clear_barriers)
 
     def build(self):
         self._build_tiles()
         self._build_player()
         self._build_enemies()
+        self._build_collectables()
         self._setup_camera()
 
     # Tile types that mark entity spawns: no visual tile is created for
@@ -44,6 +48,33 @@ class Level:
                 tile = Tile(self.game, tile_data, self.tile_size)
                 tile.node.reparentTo(self.root)
                 self.tiles.append(tile)
+                if tile_data["type"] == "barrier":
+                    self.barriers.append(tile)
+
+    def _build_collectables(self):
+        meta = self.data.get("meta") or {}
+        for spawn in self.data.get("collectable_spawns") or []:
+            params = dict(spawn.get("params") or {})
+            if spawn["type"] == "next_level":
+                payload = dict(params.get("payload") or {})
+                payload.setdefault("level", meta.get("next_level"))
+                params["payload"] = payload
+            collectable = create_collectable(
+                spawn["type"],
+                self.game,
+                (spawn["grid_x"], spawn["grid_y"]),
+                self.tile_size,
+                **params,
+            )
+            collectable.node.reparentTo(self.root)
+            self.entities.append(collectable)
+
+    def _on_clear_barriers(self, *args):
+        for tile in self.barriers:
+            if tile in self.tiles:
+                self.tiles.remove(tile)
+            tile.destroy()
+        self.barriers.clear()
 
     def _build_player(self):
         spawn = self.data["player_spawn"]
@@ -140,6 +171,7 @@ class Level:
             entity.destroy()
 
     def destroy(self):
+        self.game.event_bus.unsubscribe("clear_barriers", self._on_clear_barriers)
         for entity in self.entities:
             entity.destroy()
         for projectile in self.projectiles:

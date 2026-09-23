@@ -67,6 +67,16 @@ class HUD:
         )
         self.elements.append(self.score_label)
 
+        self.coins_label = OnscreenText(
+            text="COINS: 0",
+            pos=(0, 0.82),
+            scale=0.05,
+            fg=(1.0, 0.85, 0.2, 1),
+            align=0,
+            mayChange=True,
+        )
+        self.elements.append(self.coins_label)
+
         self.ammo_label = OnscreenText(
             text="AMMO: ∞",
             pos=(1.2, 0.9),
@@ -93,6 +103,8 @@ class HUD:
         player = gameplay.level.player
         if player:
             self.life_label.setText(f"HP: {int(player.life)}")
+            self.score_label.setText(f"SCORE: {int(player.score)}")
+            self.coins_label.setText(f"COINS: {int(player.coins)}")
             if hasattr(player, 'stamina'):
                 self.stamina_label.setText(f"STA: {int(player.stamina)}")
             if hasattr(player, 'dash_cooldown_timer'):

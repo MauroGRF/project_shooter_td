@@ -1,12 +1,14 @@
 # Level 01 - Test Map
-# W=wall, S=floor, D=door, P=player_spawn, E=enemy_spawn, C=chest
+# W=wall, S=floor, D=door, P=player_spawn, E=enemy_spawn, F=dog_spawn, C=chest
+# B=barrier, o=coin, m=score, g=weapon, x=exit, t=trigger(clear_barriers), n=next_level
+# next_level: level_02.lvl
 W W W W W W W W W W
+W S P S o S n S S W
 W S S S S S S S S W
-W S P S S S S S S W
 W S S S S E S S S W
 W S S S S S S S S W
 W S S S W W S S S W
-W S S S W W S C S W
-W S S S S S S S S W
-W S S S S S S D S W
+W S S S W B S C S W
+W S m S B B g S S W
+W S S t S S S x S W
 W W W W W W W W W W
