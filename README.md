@@ -26,10 +26,16 @@ uv run main.py
 | Accion | Tecla | Descripcion |
 |--------|-------|-------------|
 | Mover | W A S D | Desplazamiento libre en el plano XY |
-| Apuntar | Flechas | Cambia la direccion de vista del personaje |
+| Apuntar | Flechas / ratón | Dirección de vista (ratón tiene prioridad si hay mouse) |
+| Sprint | Shift | Correr (gasta stamina) |
+| Dash | Z | Desplazamiento rápido (cooldown + stamina) |
+| Parry | Ctrl | Bloqueo/reflejo (carga por near-dodge) |
+| Armas | 0 1 2 3 | melee, pistol, rifle, shotgun |
+| Munición | L | Alterna limited / infinite |
+| Efecto test | M | Aplica efecto de velocidad (debug) |
+| Disparar | Espacio / clic izq. | Ataque del arma seleccionada |
 | Pausa | P | Interrumpe el juego, muestra menu de pausa |
-| Salir | Escape | Cierra el juego o vuelve al menu principal |
-| Iniciar | Enter | Comienza la partida desde el menu |
+| Iniciar / salir | Enter / Escape | Menú: iniciar · gameplay: menú · pausa: menú |
 
 ---
 
@@ -40,9 +46,9 @@ uv run main.py
 ```
 main.py
   └── GameManager (ShowBase)
-        ├── Settings           ← config/settings.json
+        ├── Settings           ← config/{window,player,weapons,enemies,camera,audio,game}.json
         ├── EventBus           ← wrapper de messenger
-        ├── InputManager       ← teclado (WASD + flechas)
+        ├── InputManager       ← teclado + ratón (WASD, armas, dash, parry)
         ├── AudioManager       ← musica y efectos
         ├── Window             ← propiedades de ventana
         └── StateMachine
@@ -76,7 +82,7 @@ main.py
 | Archivo | Responsabilidad |
 |---------|-----------------|
 | `game_manager.py` | Clase principal que hereda de `ShowBase`. Crea e inicializa todos los sistemas. Ejecuta el game loop via `task_mgr` y delega el `update(dt)` al estado activo. |
-| `window.py` | Lee la configuracion de ventana desde `settings.json` y aplica titulo, resolucion, fullscreen y color de fondo usando `WindowProperties`. |
+| `window.py` | Lee la configuración de ventana desde `config/window.json` y aplica titulo, resolucion, fullscreen y color de fondo usando `WindowProperties`. |
 
 **GameManager** es un singleton accesible desde cualquier modulo via `GameManager.get_instance()`. Cada sistema recibe una referencia al game en su constructor.
 
@@ -84,8 +90,9 @@ main.py
 
 | Archivo | Responsabilidad |
 |---------|-----------------|
-| `settings.py` | Singleton que carga `config/settings.json`. Soporta claves anidadas con notacion punto (`game.tile_size`). Permite leer/escribir/guardar configuraciones en runtime. |
-| `event_bus.py` | Wrapper del `messenger` de Panda3D. Provee `subscribe(event, callback)`, `unsubscribe(event, callback)` y `emit(event, *args)`. Desacopla los modulos entre si. |
+| `settings.py` | Singleton que carga los 7 archivos de dominio bajo `config/`. Falla al boot si falta archivo o key requerida. Acceso por property (`settings.player`) o dotted (`get("game.tile_size")`) con espejo legacy `game.*`. |
+| `event_bus.py` | Wrapper del `messenger` de Panda3D. Provee `subscribe(event, callback)`, `unsubscribe(event, callback)` y `emit(event, *args)`. Desacopla los modulos entre si. Se registra como singleton en `__init__`. |
+| `warn_once.py` | Helper `warn_once(key, msg)` para surfear excepciones tragadas sin spam por frame. |
 
 **EventBus** es el corazon del desacoplamiento. Los sistemas emiten eventos (`entity_died`, `projectile_fired`, `state_changed`) y los componentes se suscriben sin conocer al emisor.
 
@@ -106,8 +113,8 @@ main.py
 
 | Archivo | Responsabilidad |
 |---------|-----------------|
-| `level_manager.py` | Lee archivos `.lvl` (matriz ASCII), parsea cada caracter a un tipo de tile, y retorna un diccionario con `width`, `height`, `tiles[][]`, `player_spawn` y `enemy_spawns[]`. |
-| `level.py` | Recibe los datos del nivel, instancia tiles, personajes y enemigos. Crea un CameraSystem por nivel. Ejecuta el update de physics, collision, animation y camera. Gestiona la lifecycle de entidades y proyectiles. |
+| `level_manager.py` | Lee archivos `.lvl` (matriz ASCII), parsea cada caracter a un tipo de tile, y retorna un diccionario con `width`, `height`, `tiles[][]`, `player_spawn`, `enemy_spawns[]` y `dog_spawns[]`. |
+| `level.py` | Recibe los datos del nivel, instancia tiles, personajes y enemigos. Crea Physics/Collision/Animation/Camera por nivel. Ejecuta el update en orden y gestiona lifecycle de entidades, proyectiles y melee hitboxes. |
 
 **Formato `.lvl`:** cada linea es una fila de tiles separados por espacios. Lineas que empiezan con `#` son comentarios.
 
@@ -127,72 +134,68 @@ W W W W W W W W W W
 | `S` | floor | Si | Suelo base del mapa |
 | `P` | spawn_player | Si | Posicion inicial del jugador (no genera tile) |
 | `E` | spawn_enemy | Si | Posicion de enemigos (no genera tile) |
+| `F` | spawn_dog | Si | Posicion de dogs (no genera tile) |
 | `D` | door | Si | Puerta (transicion entre areas) |
 | `C` | chest | No | Cofre interactuable |
 
 **Logica de colision por tiles:**
 - `LevelManager` calcula la posicion world-space de cada tile: `(grid_x * tile_size, grid_y * tile_size)`
-- `tile_size` esta definido en `settings.json` (default: 1.0 unidad)
+- `tile_size` esta definido en `config/game.json` (default: 1.0 unidad)
 
 ### `src/entities/` — Entidades del juego
 
 | Archivo | Responsabilidad |
 |---------|-----------------|
-| `entity_base.py` | Clase base para todas las entidades. Maneja: nodo3D, vida, daño, muerte, tipo de entidad. |
-| `character.py` | Hereda de `EntityBase`. Personajes (player y enemigos). Movimiento con colision a tiles, apuntar por flechas, IA basica para enemigos. |
-| `tile.py` | Hereda de `EntityBase`. Tiles estaticos del mapa. Genera geometria visual con `CardMaker`: suelo plano y paredes como bloques 3D (5 caras). |
-| `projectile.py` | Hereda de `EntityBase`. Proyectil con velocidad, danyo, lifetime y direccion. |
+| `entity_base.py` | Clase base: nodo3D, vida, daño, muerte, tipo, contacts, anims, swap/destroy de modelo. |
+| `model_loader.py` | Carga glTF/GLB/egg/bam + `resolve_visual()` (fuente única de verdad: class MODEL > config default). |
+| `character.py` | Hereda de `EntityBase`. Movimiento con colisión AABB por caja, aim, shoot base. |
+| `player/player.py` | Stamina, sprint, dash, parry, 4 armas, melee trail, status effects. |
+| `enemies/enemy.py` | Enemy (ranged) y Dog (melee). AI data-driven vía dict de states. |
+| `tile.py` | Tile estático: wall = box `tile_box.glb`; floor/door/chest = card plana con textura `TileTextureCache`. |
+| `projectile.py` | Proyectil con speed/damage opcionales por constructor (default = config). |
+| `melee_hitbox.py` | Hitbox temporal del swing melee. |
 
-**EntityBase:**
+**Jerarquía:**
 ```
-- node: NodePath (nodo 3D en la escena)
-- life / max_life: puntos de vida
-- alive: booleano de estado
-- speed: velocidad de movimiento
-- entity_type: string identificador ("player", "enemy", "wall", etc.)
-```
-
-**Character (player/enemy):**
-```
-- move(dx, dy, dt, tiles): mueve por eje independiente (permite deslizarse langs de paredes)
-- aim(dx, dy): cambia la orientacion visual con atan2(dx, -dy)
-- shoot(): genera un Projectile (disabled actualmente)
-- _update_ai(dt): enemigos persiguen al jugador y disparan
+EntityBase
+  ├── Character
+  │     ├── Player
+  │     └── Enemy → Dog
+  ├── Tile
+  ├── Projectile
+  └── MeleeHitbox
 ```
 
-**Tile (suelo/pared):**
+**EntityBase (campos clave):**
 ```
-- Genera CardMaker para cada cara visible
-- Paredes: 5 caras (top + front + back + left + right)
-- Suelo: 1 cara orientada con setP(-90)
-- Colores por tipo de tile
+node, life/max_life, alive, speed, velocity, entity_type
+COLLISION_HALF_EXTENTS (subclases miden su visual)
 ```
 
 ### `src/systems/` — Sistemas del juego
 
 | Archivo | Responsabilidad |
 |---------|-----------------|
-| `input_manager.py` | Captura teclado. WASD para movimiento, flechas para apuntar. Proporciona `get_movement()` y `get_aim()` normalizados. |
-| `physics.py` | Actualiza posiciones basado en velocity. Soporta gravedad y colision walkable con tiles. |
-| `collision.py` | Deteccion de colisiones: proyectil↔entity (distance < hit_range) y entity↔tile (AABB push). |
-| `camera.py` | Sistema de camara isometrica. Configuracion estatica por nivel o seguimiento dinamico de entidad. |
+| `input_manager.py` | Captura teclado/ratón. WASD, flechas, Shift sprint, Z dash, Ctrl parry, 0-3 armas, L ammo, mouse aim. Expone `get_movement()` / `get_aim()` y llama `request_*` del player. |
+| `physics.py` | Walkability AABB compartida (`is_position_walkable`) + path de velocity (inerte hoy). |
+| `collision.py` | Proyectil↔entity (`PROJECTILE_HIT_RANGE`), entity↔tile push, entity↔entity contacts + contact damage, melee hitboxes. |
+| `camera.py` | Sistema de camara isometrica. Configuracion estática por nivel o follow de entidad. |
 | `audio_manager.py` | Carga y reproduce musica de fondo y efectos de sonido. |
-| `animation_system.py` | Sistema de animaciones frame-based. Registra secuencias de frames (scale, color, pos_offset) y las reproduce con loop o una vez. |
+| `animation_system.py` | Animaciones frame-based (scale, color, pos_offset), loop o one-shot. |
+| `status_effects.py` | Buffs temporales (speed multiplier, etc.) sobre el player. |
 
 **InputManager — flujo del input:**
 ```
-1. Tecla presionada → accept("w", _set_key, ["w", True])
-2. _set_key actualiza self.keys["w"] = True
-3. update(dt) consulta self.keys y genera vector de movimiento/aim
-4. Se aplica al personaje via player.move() / player.aim()
+1. Tecla → accept(...) → _set_key / _on_action / request_*
+2. update(dt) consulta keys + mouse y llama player.request_move/aim/shoot
+3. Acciones de estado (enter/escape/pause) emiten por EventBus
 ```
 
-**Collision — algoritmo AABB:**
+**Collision — AABB por caja:**
 ```
-1. Para cada entidad, verifica contra cada tile no-walkable
-2. Calcula distancia absoluta en X e Y al centro del tile
-3. Si ambas distancias son menores a half (tile_size * 0.5), hay colision
-4. Aplica push en el eje de menor penetracion para expulsar al entity
+1. entity↔tile: half-extents del entity vs half tile; push en eje de menor penetración
+2. proyectil↔entity: distancia < PROJECTILE_HIT_RANGE (+ dodge window para parry)
+3. entity↔entity: pares por distancia → entity_enter/exit + contact damage
 ```
 
 **CameraSystem — modos de operacion:**
@@ -203,50 +206,38 @@ W W W W W W W W W W
 4. update(dt): actualiza posicion si hay target activo
 ```
 - La camara se instancia por nivel (cada Level crea su CameraSystem)
-- Configuracion desde `settings.json`: `camera.height`, `camera.fov`
+- Configuracion desde `config/camera.json`: `camera.height`, `camera.fov`
 
 ### `src/ui/` — Interfaces de usuario
 
 | Archivo | Responsabilidad |
 |---------|-----------------|
-| `hud.py` | Muestra HP, Score y Ammo como `OnscreenText` sobre `aspect2d`. Se actualiza cada frame con los datos del jugador. |
+| `hud.py` | HP, stamina, dash, parry, arma, score, ammo, effects como `OnscreenText`. Lee el player vía GameplayState cada frame. |
 | `menu_ui.py` | Componentes de menu con `DirectGui` (botones, frames). Util para menus interactivos con mouse. |
 
 ---
 
-## Configuracion (`config/settings.json`)
+## Configuracion (`config/*.json`)
 
-```json
-{
-    "window": {
-        "title": "TD Shooter",
-        "width": 1280,
-        "height": 720,
-        "fullscreen": false,
-        "BackgroundColor": [0.1, 0.1, 0.15, 1.0]
-    },
-    "game": {
-        "tile_size": 1.0,
-        "gravity": -20.0,
-        "player_speed": 5.0,
-        "player_life": 100,
-        "projectile_speed": 15.0,
-        "projectile_damage": 10,
-        "enemy_speed": 2.5,
-        "enemy_life": 30
-    },
-    "camera": {
-        "height": 15.0,
-        "fov": 60
-    },
-    "audio": {
-        "music_volume": 0.7,
-        "sfx_volume": 0.8
-    }
-}
+Un archivo por dominio; cada uno envuelve sus keys bajo una sección top-level con el nombre del dominio. `Settings` valida required keys al boot y falla con mensaje claro si falta algo.
+
+| Archivo | Seccion | Contenido clave |
+|---------|---------|-----------------|
+| `window.json` | `window` | title, width, height, fullscreen, backgroundColor |
+| `player.json` | `player` | speed, life, stamina, dash, parry, melee, model |
+| `weapons.json` | `weapons` | armas `0`–`3` (type, damage, fire_rate, pellets, spread…) |
+| `enemies.json` | `enemies` | enemy/dog stats + model scale/rotation/offset |
+| `camera.json` | `camera` | height, angle, near, far, fov |
+| `audio.json` | `audio` | music_volume, sfx_volume |
+| `game.json` | `game` | tile_size, gravity, projectile_*, tile_model, wall_height… |
+
+Acceso:
+
+```python
+settings.player["player_speed"]   # preferred: domain property
+settings.get("game.tile_size")    # dotted (legacy mirror for player/enemies keys)
+settings["camera.height"]         # __getitem__ → get()
 ```
-
-Acceso desde codigo: `game.settings.get("game.player_speed")` o `game.settings["game.player_speed"]`.
 
 ---
 
@@ -274,8 +265,11 @@ InputManager                    EventBus                      GameplayState
 | `pause_pressed` | InputManager | Tecla P presionada |
 | `state_changed` | StateMachine | Transicion de estado completada |
 | `entity_died` | EntityBase | Una entidad perdio toda su vida |
-| `projectile_fired` | Character | Se genero un proyectil |
+| `player_died` | Player | El jugador murio |
+| `entity_enter` / `entity_exit` | CollisionSystem | Par de entidades entro/salio de contacto |
 | `projectile_hit` | CollisionSystem | Proyectil impacto una entidad |
+| `projectile_reflected` | CollisionSystem | Proyectil rebotado por parry |
+| `melee_hitbox` hit | CollisionSystem | Hitbox melee impacto |
 
 ---
 
@@ -296,25 +290,27 @@ camera.lookAt(center_x, center_y, 0)
 
 ---
 
-## Modelos de prueba
+## Modelos y assets
 
-El juego usa modelos built-in de Panda3D para testing:
+| Entidad | Modelo / visual | Fuente |
+|---------|-----------------|--------|
+| Player | `models/smiley` | clase `Player.MODEL` |
+| Enemy / Dog | `assets/models/enemy_fixed.gltf` | clase (`scale` 0.13) |
+| Wall tile | `assets/models/tile_box.glb` | config `game.tile_model` |
+| Floor/door/chest | CardMaker plana + textura | `TileTextureCache` (`assets/textures/*.png`) |
+| Proyectil | CardMaker cuadrado | código en `Projectile` |
+| Marker player/enemy | CardMaker sobre la entidad | código |
 
-| Entidad | Modelo | Descripcion |
-|---------|--------|-------------|
-| Player | `models/smiley` | Esfera sonriente |
-| Enemy | `models/panda-model` | Panda 3D basico |
-| Tiles | `CardMaker` | Geometria generada por codigo |
-| Proyectil | `CardMaker` | Cuadrado amarillo |
+`resolve_visual(entity_type, cls, game)` es la única puerta: gana la clase si declara `MODEL*`; si no, el default del config; si no hay ninguno, `ValueError` (fail-fast).
 
 ---
 
 ## Proximos pasos
 
-- [ ] Sistema de disparo funcional con cooldown
+- [x] Sistema de disparo funcional con cooldown (4 armas + melee)
 - [ ] Animaciones de movimiento y disparo
-- [ ] Sistema de audio (musica y SFX)
-- [ ] Enemigos con patrones de IA variados
+- [x] Sistema de audio (musica y SFX)
+- [x] Enemigos con patrones de IA variados (FSM idle/chase/attack + Dog melee)
 - [ ] multiples niveles con transiciones
 - [ ] Sistema de vida/muerte con respawn
 - [ ] UI con DirectGui para menus interactivos

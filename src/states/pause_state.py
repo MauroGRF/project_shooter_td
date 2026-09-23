@@ -39,4 +39,9 @@ class PauseState(StateBase):
         self.game.state_machine.change_state("gameplay")
 
     def _on_menu(self, *args):
+        # GameplayState.exit preserved the level for pause; free it now
+        # so going back to the menu does not leak the whole level.
+        gameplay = self.game.state_machine.get_state("gameplay")
+        if gameplay is not None:
+            gameplay.teardown()
         self.game.state_machine.change_state("menu")

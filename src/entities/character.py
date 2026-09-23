@@ -1,30 +1,76 @@
 from panda3d.core import Vec4
 import math
 from src.entities.entity_base import EntityBase
+from src.entities.model_loader import resolve_visual
+from src.systems.physics import WALK_RADIUS_FACTOR, is_position_walkable
+from src.core.warn_once import warn_once
 
 
 class Character(EntityBase):
-    def __init__(self, game, entity_type="character", model_name=None, grid_pos=(0, 0), tile_size=1.0):
-        super().__init__(game, entity_type, model_name)
+    # Collision box half-extents (hx, hy) in world units, measured from
+    # the visual's tight bounds (node origin == box center). Subclasses
+    # override with their own visual size. None = legacy square
+    # (tile_size * WALK_RADIUS_FACTOR).
+    COLLISION_HALF_EXTENTS = None
+
+    def __init__(self, game, entity_type="character", model_name=None, grid_pos=(0, 0), tile_size=1.0,
+                 model_scale=None, model_rotation=None, model_offset=None):
+        # Single source of truth: class attrs win, else config default.
+        # Explicit params are per-slot overrides (default None = no override).
+        resolved = resolve_visual(entity_type, type(self), game)
+        if model_name is None:
+            model_name = resolved[0]
+        if model_scale is None:
+            model_scale = resolved[1]
+        if model_rotation is None:
+            model_rotation = resolved[2]
+        if model_offset is None:
+            model_offset = resolved[3]
+        super().__init__(game, entity_type, model_name,
+                         model_scale=model_scale, model_offset=model_offset,
+                         model_rotation=model_rotation)
 
         self.tile_size = tile_size
         self.grid_x = grid_pos[0]
         self.grid_y = grid_pos[1]
-        self._walkable_radius = tile_size * 0.5
+        self._walkable_half_extents = self.get_collision_half_extents()
 
         self.aim_dx = 0
         self.aim_dy = 1
         self.shoot_cooldown = 0.0
         self.shoot_rate = 0.25
+        # Base heading correction (model_rotation H) preserved across aim().
+        # setH() keeps P/R, so only H needs re-adding here.
+        try:
+            self._base_h = float(model_rotation[0]) if isinstance(model_rotation, (list, tuple)) else float(model_rotation)
+        except (TypeError, ValueError):
+            self._base_h = 0.0
 
         world_x = self.grid_x * tile_size
         world_y = self.grid_y * tile_size
         self.node.setPos(world_x, world_y, 0.0)
 
-        if entity_type == "player":
-            self.node.setScale(0.4)
-        else:
-            self.node.setScale(0.5)
+        # Scale comes from the resolved visual (class wins, else config
+        # default) and was already applied by EntityBase. No magic
+        # fallback here: each class/config owns its scale.
+
+        # Re-apply offset additively: setPos above reset the absolute
+        # offset EntityBase applied before spawn positioning.
+        if self._model_offset is not None:
+            try:
+                if isinstance(self._model_offset, (list, tuple)):
+                    self.node.setPos(
+                        self.node.getX() + float(self._model_offset[0]),
+                        self.node.getY() + float(self._model_offset[1]),
+                        self.node.getZ() + float(self._model_offset[2]),
+                    )
+                else:
+                    self.node.setZ(self.node.getZ() + float(self._model_offset))
+            except Exception as exc:
+                warn_once(
+                    f"character.offset.{self.entity_type}",
+                    f"[Character] bad model_offset on {self.entity_type}: {exc!r}",
+                )
 
     def move(self, dx, dy, dt, tiles=None):
         if not self.alive:
@@ -87,20 +133,27 @@ class Character(EntityBase):
         self.grid_x = int(round(self.node.getX() / self.tile_size))
         self.grid_y = int(round(self.node.getY() / self.tile_size))
 
+    def get_collision_half_extents(self):
+        """Return this entity's (hx, hy) collision half-extents."""
+        if self.COLLISION_HALF_EXTENTS is not None:
+            return (
+                float(self.COLLISION_HALF_EXTENTS[0]),
+                float(self.COLLISION_HALF_EXTENTS[1]),
+            )
+        legacy = self.tile_size * WALK_RADIUS_FACTOR
+        return (legacy, legacy)
+
     def _is_walkable(self, x, y, tiles):
-        for tile in tiles:
-            if not tile.walkable:
-                tx, ty = tile.node.getX(), tile.node.getY()
-                if abs(x - tx) < self._walkable_radius and abs(y - ty) < self._walkable_radius:
-                    return False
-        return True
+        return is_position_walkable(
+            x, y, tiles, half_extents=self._walkable_half_extents
+        )
 
     def aim(self, dx, dy):
         if dx != 0 or dy != 0:
             self.aim_dx = dx
             self.aim_dy = dy
             angle = math.degrees(math.atan2(dx, -dy))
-            self.node.setH(angle)
+            self.node.setH(angle + self._base_h)
 
     def shoot(self, level):
         if not self.alive or self.shoot_cooldown > 0:

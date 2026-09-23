@@ -1,6 +1,6 @@
 from src.entities.tile import Tile
 from src.entities.player import Player
-from src.entities.enemy import Dog, Enemy
+from src.entities.enemies import Dog, Enemy
 from src.systems.physics import Physics
 from src.systems.collision import CollisionSystem
 from src.systems.animation_system import AnimationSystem
@@ -32,10 +32,14 @@ class Level:
         self._build_enemies()
         self._setup_camera()
 
+    # Tile types that mark entity spawns: no visual tile is created for
+    # them (the floor underneath is implied walkable).
+    SPAWN_TILE_TYPES = ("spawn_player", "spawn_enemy", "spawn_dog")
+
     def _build_tiles(self):
         for row in self.data["tiles"]:
             for tile_data in row:
-                if tile_data["type"] == "spawn_player":
+                if tile_data["type"] in self.SPAWN_TILE_TYPES:
                     continue
                 tile = Tile(self.game, tile_data, self.tile_size)
                 tile.node.reparentTo(self.root)
@@ -44,12 +48,11 @@ class Level:
     def _build_player(self):
         spawn = self.data["player_spawn"]
         if spawn is None:
-            spawn = (0, 0)
+            raise ValueError("Level data has no player_spawn (missing 'P' tile)")
 
-        model_name = "models/smiley"
+        # Visual owned by Player (class attrs win, else config default).
         self.player = Player(
             self.game,
-            model_name=model_name,
             grid_pos=spawn,
             tile_size=self.tile_size,
         )
@@ -58,11 +61,10 @@ class Level:
         self.game.input_manager.bind_player(self.player)
 
     def _build_enemies(self):
-        model_name = "models/panda-model"
+        # Visuals owned by Enemy/Dog (class attrs win, else config default).
         for spawn in self.data["enemy_spawns"]:
             enemy = Enemy(
                 self.game,
-                model_name=model_name,
                 grid_pos=spawn,
                 tile_size=self.tile_size,
             )
@@ -72,7 +74,6 @@ class Level:
         for spawn in self.data["dog_spawns"]:
             dog = Dog(
                 self.game,
-                model_name=model_name,
                 grid_pos=spawn,
                 tile_size=self.tile_size,
             )

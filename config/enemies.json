@@ -1,0 +1,18 @@
+{
+    "enemies": {
+        "enemy_speed": 2.5,
+        "enemy_life": 30,
+        "enemy_contact_damage": 15,
+        "enemy_contact_interval": 0.6,
+        "enemy_model": "assets/models/enemy_fixed.gltf",
+        "enemy_model_scale": 0.13,
+        "enemy_model_rotation": [0, 0, 0],
+        "enemy_model_offset": [0.13, 0.07, 0.0],
+        "dog_speed": 3.0,
+        "dog_life": 15,
+        "dog_damage": 10,
+        "dog_attack_cooldown": 1.0,
+        "dog_attack_range": 0.8,
+        "dog_aggro_range": 3.0
+    }
+}

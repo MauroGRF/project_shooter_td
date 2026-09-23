@@ -16,7 +16,6 @@ class GameManager(ShowBase):
 
         self.settings = Settings.get_instance()
         self.event_bus = EventBus(self)
-        self.event_bus._set_instance(self)
 
         self.window_config = Window(self)
 

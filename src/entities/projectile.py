@@ -4,12 +4,22 @@ from src.entities.entity_base import EntityBase
 
 
 class Projectile(EntityBase):
-    def __init__(self, game, owner, position, direction, color=None):
+    def __init__(self, game, owner, position, direction, color=None,
+                 damage=None, speed=None):
         EntityBase.__init__(self, game, "projectile")
 
         self.owner = owner
-        self.speed = game.settings.get("game.projectile_speed", 15.0)
-        self.damage = game.settings.get("game.projectile_damage", 10)
+        # Optional per-shot overrides; fall back to shared projectile config.
+        self.speed = (
+            speed
+            if speed is not None
+            else game.settings.get("game.projectile_speed", 15.0)
+        )
+        self.damage = (
+            damage
+            if damage is not None
+            else game.settings.get("game.projectile_damage", 10)
+        )
         self.lifetime = 3.0
         self.age = 0.0
 
@@ -59,6 +69,4 @@ class Projectile(EntityBase):
         return not self.alive
 
     def destroy(self):
-        if self.node:
-            self.node.removeNode()
-            self.node = None
+        EntityBase.destroy(self)

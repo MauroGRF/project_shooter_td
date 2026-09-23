@@ -6,6 +6,15 @@ from src.systems.status_effects import StatusEffect, StatusEffectSystem
 
 
 class Player(Character):
+    # Single source of truth for the player visual: the class wins over
+    # config. SCALE 0.4 formalizes the old magic fallback in Character.
+    MODEL = "models/smiley"
+    MODEL_SCALE = 0.4
+    MODEL_ROTATION = None
+    MODEL_OFFSET = None
+    # Tight bounds of models/smiley at scale 0.4: 0.80 x 0.80.
+    COLLISION_HALF_EXTENTS = (0.4, 0.4)
+
     def __init__(self, game, model_name=None, grid_pos=(0, 0), tile_size=1.0):
         super().__init__(game, "player", model_name, grid_pos, tile_size)
 
@@ -72,11 +81,13 @@ class Player(Character):
 
         self._add_marker()
 
-    def _add_marker(self):
+    def _add_marker(self, marker_height=None):
+        if marker_height is None:
+            marker_height = self.game.settings.get("game.marker_height", 0.6)
         cm = CardMaker("player_marker")
         cm.setFrame(-0.3, 0.3, -0.3, 0.3)
         marker = self.node.attachNewNode(cm.generate())
-        marker.setZ(0.6)
+        marker.setZ(marker_height)
         marker.setP(-90)
         marker.setColor(Vec4(0.1, 0.8, 0.2, 0.8))
 
@@ -255,9 +266,9 @@ class Player(Character):
                 position=self.get_position(),
                 direction=(dx, dy),
                 color=color,
+                damage=damage,
+                speed=speed,
             )
-            projectile.damage = damage
-            projectile.speed = speed
             level.add_projectile(projectile)
 
     def _start_melee(self, weapon, level):

@@ -1,0 +1,14 @@
+{
+    "window": {
+        "title": "TD Shooter",
+        "width": 1280,
+        "height": 720,
+        "fullscreen": false,
+        "backgroundColor": [
+            0.1,
+            0.1,
+            0.15,
+            1.0
+        ]
+    }
+}

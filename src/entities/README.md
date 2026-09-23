@@ -234,7 +234,7 @@ character._is_walkable(x, y, tiles)
 
 Subclase de Character para el jugador controlado por humano.
 
-**Archivo:** `player.py`
+**Archivo:** `player/player.py`
 **Hereda de:** Character
 
 ### Propiedades
@@ -242,8 +242,8 @@ Subclase de Character para el jugador controlado por humano.
 | Propiedad | Valor | Fuente |
 |-----------|-------|--------|
 | `entity_type` | `"player"` | Hardcoded |
-| `life` | 100 | `settings.json → game.player_life` |
-| `speed` | 5.0 | `settings.json → game.player_speed` |
+| `life` | 100 | `config/player.json → player.player_life` |
+| `speed` | 5.0 | `config/player.json → player.player_speed` |
 
 ### Métodos
 
@@ -264,7 +264,7 @@ player.die()         # Emite "player_died" además de "entity_died"
 
 Subclase de Character para enemigos con AI básica.
 
-**Archivo:** `enemy.py`
+**Archivo:** `enemies/enemy.py`
 **Hereda de:** Character
 
 ### Propiedades
@@ -272,8 +272,8 @@ Subclase de Character para enemigos con AI básica.
 | Propiedad | Valor | Fuente |
 |-----------|-------|--------|
 | `entity_type` | `"enemy"` | Hardcoded |
-| `life` | 30 | `settings.json → game.enemy_life` |
-| `speed` | 2.5 | `settings.json → game.enemy_speed` |
+| `life` | 30 | `config/enemies.json → enemies.enemy_life` |
+| `speed` | 2.5 | `config/enemies.json → enemies.enemy_speed` |
 | `attack_range` | tile_size * 3 | Calculado |
 | `aggro_range` | tile_size * 6 | Calculado |
 
