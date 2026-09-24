@@ -71,6 +71,7 @@ _VISUAL_CONFIG_KEYS = {
     ),
     "tile": ("game", "tile_model", None, None, None),
     "wall": ("game", "tile_model", None, None, None),
+    "barrier": ("game", "tile_model", None, None, None),
     "floor": ("game", "tile_model", None, None, None),
     "door": ("game", "tile_model", None, None, None),
     "chest": ("game", "tile_model", None, None, None),
