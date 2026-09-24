@@ -1,6 +1,7 @@
 from src.entities.tile import Tile
 from src.entities.player import Player
 from src.entities.enemies import Dog, Enemy
+from src.entities.collectables import create_collectable
 from src.systems.physics import Physics
 from src.systems.collision import CollisionSystem
 from src.systems.animation_system import AnimationSystem
@@ -14,6 +15,7 @@ class Level:
         self.tile_size = game.settings.get("game.tile_size", 1.0)
 
         self.tiles = []
+        self.barriers = []
         self.entities = []
         self.projectiles = []
         self.melee_hitboxes = []
@@ -25,25 +27,107 @@ class Level:
         self.camera = CameraSystem(game)
 
         self.root = self.game.render.attachNewNode("level_root")
+        self.game.event_bus.subscribe("clear_barriers", self._on_clear_barriers)
+        self.game.event_bus.subscribe("interact_pressed", self._on_interact_pressed)
 
     def build(self):
         self._build_tiles()
         self._build_player()
         self._build_enemies()
+        self._build_collectables()
         self._setup_camera()
 
-    # Tile types that mark entity spawns: no visual tile is created for
-    # them (the floor underneath is implied walkable).
+    # Tile types that mark entity spawns. Kept for back-compat; the
+    # builder below lays a floor base under every non-wall cell anyway.
     SPAWN_TILE_TYPES = ("spawn_player", "spawn_enemy", "spawn_dog")
+
+    # Element tiles sit ON TOP of the floor base (solid, walkable False).
+    ELEMENT_TILE_TYPES = ("door", "barrier", "chest")
 
     def _build_tiles(self):
         for row in self.data["tiles"]:
             for tile_data in row:
-                if tile_data["type"] in self.SPAWN_TILE_TYPES:
+                t = tile_data["type"]
+                gx, gy = tile_data["grid_x"], tile_data["grid_y"]
+                if t == "wall":
+                    tile = Tile(self.game, tile_data, self.tile_size)
+                    tile.node.reparentTo(self.root)
+                    self.tiles.append(tile)
                     continue
-                tile = Tile(self.game, tile_data, self.tile_size)
-                tile.node.reparentTo(self.root)
-                self.tiles.append(tile)
+                # Base terrain: floor under everything that is not a wall,
+                # whether or not an element spawns on top. No more holes.
+                floor = Tile(
+                    self.game,
+                    {"type": "floor", "grid_x": gx, "grid_y": gy,
+                     "walkable": True, "damage": 0},
+                    self.tile_size,
+                )
+                floor.node.reparentTo(self.root)
+                self.tiles.append(floor)
+                if t in self.ELEMENT_TILE_TYPES:
+                    tile = Tile(self.game, tile_data, self.tile_size)
+                    tile.node.reparentTo(self.root)
+                    self.tiles.append(tile)
+                    if t == "barrier":
+                        self.barriers.append(tile)
+
+    def _build_collectables(self):
+        meta = self.data.get("meta") or {}
+        for spawn in self.data.get("collectable_spawns") or []:
+            params = dict(spawn.get("params") or {})
+            if spawn["type"] == "next_level":
+                payload = dict(params.get("payload") or {})
+                payload.setdefault("level", meta.get("next_level"))
+                params["payload"] = payload
+            collectable = create_collectable(
+                spawn["type"],
+                self.game,
+                (spawn["grid_x"], spawn["grid_y"]),
+                self.tile_size,
+                **params,
+            )
+            collectable.node.reparentTo(self.root)
+            self.entities.append(collectable)
+
+    def _on_clear_barriers(self, *args):
+        # The floor base already exists under every barrier, so clearing
+        # only removes the element tile. No hole left behind.
+        for tile in self.barriers:
+            if tile in self.tiles:
+                self.tiles.remove(tile)
+            tile.destroy()
+        self.barriers.clear()
+
+    def _on_interact_pressed(self, *args):
+        """Open the closest adjacent chest (chebyshev ≤ 1) and drop loot.
+
+        Single chest per press: only the first adjacent closed chest is
+        opened. Re-pressing E with no chest nearby is a no-op.
+        """
+        if not self.player or not self.player.alive:
+            return
+        px = self.player.grid_x
+        py = self.player.grid_y
+        for tile in self.tiles:
+            if tile.entity_type != "chest" or tile.opened:
+                continue
+            if max(abs(tile.grid_x - px), abs(tile.grid_y - py)) <= 1:
+                tile.open()
+                self._drop_chest_loot()
+                return
+
+    def _drop_chest_loot(self):
+        from src.entities.collectables.chest_loot import roll_chest_loot
+
+        kind, value = roll_chest_loot()
+        if kind == "coins":
+            self.player.add_coin(value)
+        elif kind == "score":
+            self.player.add_score(value)
+        elif kind == "refill":
+            self.player.reload_weapon()
+        elif kind == "heal":
+            self.player.heal(value)
 
     def _build_player(self):
         spawn = self.data["player_spawn"]
@@ -86,6 +170,8 @@ class Level:
         center_x = width / 2.0
         center_y = height / 2.0
         self.camera.setup(center_x, center_y)
+        # Bounds clamp keeps the panned look-at inside the map.
+        self.camera.set_level_bounds(self.data["width"], self.data["height"], self.tile_size)
 
     def update(self, dt):
         self.physics.update(dt, self.entities + self.projectiles, self.tiles)
@@ -140,6 +226,8 @@ class Level:
             entity.destroy()
 
     def destroy(self):
+        self.game.event_bus.unsubscribe("clear_barriers", self._on_clear_barriers)
+        self.game.event_bus.unsubscribe("interact_pressed", self._on_interact_pressed)
         for entity in self.entities:
             entity.destroy()
         for projectile in self.projectiles:

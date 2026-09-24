@@ -36,6 +36,8 @@ class CollisionSystem:
                     continue
                 if entity == projectile.owner:
                     continue
+                if getattr(entity, "collectable", False):
+                    continue
 
                 ent_pos = entity.node.getPos()
                 dx = proj_pos.getX() - ent_pos.getX()

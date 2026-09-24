@@ -4,6 +4,9 @@
         "angle": 60,
         "near": 0.1,
         "far": 1000.0,
-        "fov": 60
+        "fov": 60,
+        "pan_speed": 14.0,
+        "rotate_speed": 2.5,
+        "look_deadzone": 0.05
     }
 }

@@ -11,7 +11,10 @@ class Player(Character):
     MODEL = "models/smiley"
     MODEL_SCALE = 0.4
     MODEL_ROTATION = None
-    MODEL_OFFSET = None
+    # Smiley mesh spans z -1..1, so at scale 0.4 the feet sit at -0.4.
+    # Lift the origin so feet rest on the floor (z=0) instead of cutting
+    # through the floor cards.
+    MODEL_OFFSET = 0.4
     # Tight bounds of models/smiley at scale 0.4: 0.80 x 0.80.
     COLLISION_HALF_EXTENTS = (0.4, 0.4)
 
@@ -78,6 +81,11 @@ class Player(Character):
 
         # status effects (speed multiplier etc.)
         self.status_effects = StatusEffectSystem(game)
+
+        # pickup economy
+        self.coins = 0
+        self.score = 0
+        self.keys = 0
 
         self._add_marker()
 
@@ -189,6 +197,31 @@ class Player(Character):
         for key, weapon in self.weapons.items():
             if weapon.get("type") != "melee":
                 self.weapon_ammo[key] = weapon.get("ammo", 999)
+
+    def add_coin(self, n=1):
+        self.coins += n
+
+    def add_score(self, n=1):
+        self.score += n
+
+    def add_key(self, n=1):
+        self.keys += n
+
+    def use_key(self):
+        """Consume one key from inventory. Returns True if a key was spent."""
+        if self.keys <= 0:
+            return False
+        self.keys -= 1
+        return True
+
+    def reload_weapon(self, key=None):
+        if key is None:
+            self._refill_ammo()
+            return
+        weapon = self.weapons.get(key)
+        if not weapon or weapon.get("type") == "melee":
+            return
+        self.weapon_ammo[key] = weapon.get("ammo", 999)
 
     def get_effective_speed(self):
         return self.speed * self.status_effects.get_modifier("speed_multiplier")

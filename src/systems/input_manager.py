@@ -71,6 +71,7 @@ class InputManager:
         self._bind_action(["enter", "shift-enter"], "enter_pressed")
         self._bind_action(["escape", "shift-escape"], "escape_pressed")
         self._bind_action(["p", "shift-p"], "pause_pressed")
+        self._bind_action(self._key_event_names("e"), "interact_pressed")
 
         self._bind_key("space", self._key_event_names("space"))
 
@@ -172,8 +173,20 @@ class InputManager:
             return
 
         dx, dy = self.get_movement()
+
+        # Space held = orbit-camera mode: WASD keeps moving the player,
+        # mouse deltas orbit the camera around the stage. Aim + shoot
+        # are skipped while orbiting. The camera persists where left.
+        space_held = self.keys["space"]
+
         sprint_intent = self._is_shift_down()
         self.player.request_move(dx, dy, sprint_intent, dt)
+
+        if space_held:
+            self._update_camera_mode(dt)
+            return
+
+        self._orbit_prev_mouse = None
 
         # parry: edge-detect the Ctrl key (polled to avoid modifier-prefix issues)
         control_down = self._is_control_down()
@@ -212,7 +225,46 @@ class InputManager:
                 f"[InputManager] mouse aim failed once: {exc!r}",
             )
 
-        if self.keys["space"] or self.keys["mouse1"]:
+        if self.keys["mouse1"]:
             gameplay = self.game.state_machine.get_state("gameplay")
             level = gameplay.level if gameplay else None
             self.player.shoot(level)
+
+    def _update_camera_mode(self, dt):
+        """Camera mode: orbit only, driven by MOUSE DELTA.
+
+        No jump on space press: the entry-frame mouse position is stored
+        as reference and no rotation is applied that frame. After that,
+        only actual mouse movement rotates (static off-centre mouse =
+        no motion). WASD is intentionally untouched here — it already
+        moved the player above.
+        """
+        try:
+            gameplay = self.game.state_machine.get_state("gameplay")
+            cs = getattr(getattr(gameplay, "level", None), "camera", None) if gameplay else None
+            if cs is None:
+                return
+            if not self.game.mouseWatcherNode.hasMouse():
+                return
+            mpos = self.game.mouseWatcherNode.getMouse()
+            sx = mpos.getX()
+            sy = mpos.getY()
+            prev = getattr(self, "_orbit_prev_mouse", None)
+            if prev is None:
+                self._orbit_prev_mouse = (sx, sy)
+                return
+            dx = sx - prev[0]
+            dy = sy - prev[1]
+            self._orbit_prev_mouse = (sx, sy)
+            if abs(dx) < 0.0005 and abs(dy) < 0.0005:
+                return
+            rotate_speed = self.game.settings.get("camera.rotate_speed", 2.5)
+            if rotate_speed <= 0:
+                return
+            # Mouse right -> view rotates right; mouse up -> tilt up.
+            cs.rotate(-dx * rotate_speed, -dy * rotate_speed, 1.0)
+        except Exception as exc:
+            warn_once(
+                "input.camera_mode",
+                f"[InputManager] camera-mode failed once: {exc!r}",
+            )

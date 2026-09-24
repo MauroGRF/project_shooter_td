@@ -144,6 +144,26 @@ class Character(EntityBase):
         return (legacy, legacy)
 
     def _is_walkable(self, x, y, tiles):
+        # Door shortcut: if a closed door is in the way and this character
+        # has a key to spend, open the door instead of being blocked.
+        # Enemies don't have a `keys` attribute so getattr returns 0 and
+        # they stay blocked like any other solid tile.
+        if self.entity_type == "player":
+            for tile in tiles:
+                if (
+                    tile.entity_type == "door"
+                    and not tile.walkable
+                    and not tile.opened
+                ):
+                    hx, hy = self._walkable_half_extents
+                    th = getattr(tile, "tile_size", self.tile_size) * 0.5
+                    if (
+                        abs(x - tile.node.getX()) < th + hx
+                        and abs(y - tile.node.getY()) < th + hy
+                    ):
+                        if self.use_key():
+                            tile.open()
+                        break
         return is_position_walkable(
             x, y, tiles, half_extents=self._walkable_half_extents
         )
