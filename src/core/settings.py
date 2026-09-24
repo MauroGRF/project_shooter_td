@@ -72,7 +72,19 @@ class Settings:
                 "dog_aggro_range",
             ),
         ),
-        "camera": ("camera.json", ("height", "angle", "near", "far", "fov")),
+        "camera": (
+            "camera.json",
+            (
+                "height",
+                "angle",
+                "near",
+                "far",
+                "fov",
+                "pan_speed",
+                "rotate_speed",
+                "look_deadzone",
+            ),
+        ),
         "audio": ("audio.json", ("music_volume", "sfx_volume")),
         "game": (
             "game.json",
