@@ -1,5 +1,6 @@
 from src.entities.collectables.collectable import Collectable
 from src.entities.collectables.event_trigger import EventTrigger
+from src.entities.collectables.key import Key
 from src.entities.collectables.level_exit import LevelExit
 from src.entities.collectables.score_bonus import ScoreBonus
 from src.entities.collectables.weapon_pickup import WeaponPickup
@@ -9,6 +10,7 @@ COLLECTABLE_TYPES = {
     "score": (ScoreBonus, {"points": 100}),
     "weapon": (WeaponPickup, {"mode": "reload"}),
     "exit": (LevelExit, {}),
+    "key": (Key, {}),
     "trigger": (EventTrigger, {"event_name": "clear_barriers"}),
     "next_level": (EventTrigger, {"event_name": "change_level"}),
 }
