@@ -1,6 +1,8 @@
 import os
-from panda3d.core import Vec4, Texture
+from panda3d.core import CardMaker, Vec4, Texture
+from src.core.warn_once import warn_once
 from src.entities.entity_base import EntityBase
+from src.entities.model_loader import load_entity_model, resolve_visual
 
 
 TILE_COLORS = {
@@ -63,6 +65,19 @@ class TileTextureCache:
 
 
 class Tile(EntityBase):
+    """Static map cell with split floor/wall visuals.
+
+    - wall: scaled unit box (assets/models/tile_box.glb) with its BASE
+      at z=0 rising to wall_height.
+    - floor/door/chest: flat CardMaker card lying in the XY plane at
+      z=floor_card_z (avoids z-fighting between adjacent tiles).
+
+    CardMaker generates cards in the XZ plane (normal -Y, vertical),
+    so the floor card needs setP(-90) to lie flat with normal +Z.
+    This was verified empirically on Panda3D 1.10.16: without the
+    pitch the card stands vertical (tightBounds Y extent ~0).
+    """
+
     def __init__(self, game, tile_data, tile_size=1.0):
         EntityBase.__init__(self, game, tile_data["type"])
 
@@ -73,14 +88,45 @@ class Tile(EntityBase):
         self.tile_size = tile_size
         self.texture = None
 
+        old_node = self.node
         self.node = self._create_visual()
+        if old_node is not None:
+            # Drop the bare placeholder NodePath created by EntityBase so
+            # it is not left orphaned.
+            try:
+                old_node.removeNode()
+            except Exception as exc:
+                warn_once(
+                    "tile.placeholder.remove",
+                    f"[Tile] removeNode placeholder failed: {exc!r}",
+                )
         world_x = self.grid_x * tile_size
         world_y = self.grid_y * tile_size
         self.node.setPos(world_x, world_y, 0)
 
-    def _create_visual(self):
-        from panda3d.core import CardMaker
+    def _tile_cfg(self, key):
+        # Single source of truth: config owns these values, no Python
+        # defaults duplicating them. Missing keys fail fast.
+        settings = getattr(self.game, "settings", None)
+        getter = getattr(settings, "get", None)
+        value = None
+        if getter is not None:
+            try:
+                value = getter("game." + key, None)
+            except Exception as exc:
+                raise ValueError(
+                    "[visual] tile config 'game.%s' lookup failed: %r"
+                    % (key, exc)
+                ) from exc
+        if value is None:
+            raise ValueError(
+                "[visual] no value for tile config 'game.%s': "
+                "Tile declares no class visual, so the config default is required."
+                % key
+            )
+        return value
 
+    def _create_visual(self):
         vis = self.game.render.attachNewNode("tile_vis")
         s = self.tile_size
         color = TILE_COLORS.get(self.entity_type, (0.4, 0.4, 0.4, 1.0))
@@ -88,40 +134,45 @@ class Tile(EntityBase):
         cache = TileTextureCache.get_instance()
         self.texture = cache.get_texture(self.entity_type, self.game)
 
-        floor_card = self._make_card("floor_card", vis, s, color, floor=True)
-
         if self.entity_type == "wall":
-            wall_h = s
-            self._make_card("wall_top", vis, s, color, z=wall_h, floor=True, shade=0.9)
-            self._make_card("wall_front", vis, s, color, y=-s / 2, shade=1.0)
-            self._make_card("wall_back", vis, s, color, y=s / 2, h=180, shade=0.95)
-            self._make_card("wall_left", vis, s, color, x=-s / 2, h=90, shade=0.85)
-            self._make_card("wall_right", vis, s, color, x=s / 2, h=-90, shade=0.85)
+            return self._create_wall_visual(vis, s, color)
+
+        return self._create_floor_visual(vis, s, color)
+
+    def _create_wall_visual(self, vis, s, color):
+        # Tile declares no class visual: model comes from the config
+        # default (game.tile_model) via the shared resolver.
+        model_path = resolve_visual(self.entity_type, type(self), self.game)[0]
+        box, _, _ = load_entity_model(self.game, model_path)
+        box.reparentTo(vis)
+
+        wall_h = self._tile_cfg("wall_height")
+        box.setScale(s, s, wall_h)
+        box.setPos(0, 0, wall_h / 2.0)
+
+        if self.texture:
+            box.setTexture(self.texture)
+        else:
+            box.setColor(Vec4(color[0], color[1], color[2], 1))
 
         return vis
 
-    def _make_card(self, name, parent, s, color, x=0, y=0, z=0, h=0, floor=False, shade=1.0):
-        from panda3d.core import CardMaker
-
-        cm = CardMaker(name)
-        cm.setFrame(-s / 2, s / 2, -s / 2, s / 2)
-        card = parent.attachNewNode(cm.generate())
-
-        card.setPos(x, y, z)
-        if floor:
-            card.setP(-90)
-            card.setZ(card.getZ() - 0.05)
-        if h != 0:
-            card.setH(h)
+    def _create_floor_visual(self, vis, s, color):
+        card_z = self._tile_cfg("floor_card_z")
+        maker = CardMaker("tile_floor")
+        maker.setFrame(-s / 2.0, s / 2.0, -s / 2.0, s / 2.0)
+        card = vis.attachNewNode(maker.generate())
+        # CardMaker cards are born vertical (XZ plane, normal -Y);
+        # pitch -90 lays the card flat with normal +Z.
+        card.setP(-90)
+        card.setPos(0, 0, card_z)
 
         if self.texture:
             card.setTexture(self.texture)
         else:
-            card.setColor(Vec4(color[0] * shade, color[1] * shade, color[2] * shade, 1))
+            card.setColor(Vec4(color[0], color[1], color[2], 1))
 
-        return card
+        return vis
 
     def destroy(self):
-        if self.node:
-            self.node.removeNode()
-            self.node = None
+        EntityBase.destroy(self)

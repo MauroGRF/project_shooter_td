@@ -8,8 +8,17 @@ class LoadingState(StateBase):
         self._load_level()
 
     def _load_level(self):
-        level_manager = LevelManager(self.game)
-        level_data = level_manager.load(self.level_file)
+        try:
+            level_manager = LevelManager(self.game)
+            level_data = level_manager.load(self.level_file)
+            if level_data.get("player_spawn") is None:
+                raise ValueError(
+                    f"Level '{self.level_file}' has no player spawn (missing 'P' tile)"
+                )
+        except (FileNotFoundError, ValueError, KeyError, OSError) as e:
+            print(f"[LoadingState] ERROR loading '{self.level_file}': {e}. Returning to menu.")
+            self.game.state_machine.change_state("menu", error=str(e))
+            return
 
         from src.states.gameplay_state import GameplayState
         gameplay = self.game.state_machine.get_state("gameplay")

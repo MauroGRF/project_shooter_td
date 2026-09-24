@@ -1,0 +1,29 @@
+{
+    "player": {
+        "player_speed": 5.0,
+        "player_life": 100,
+        "player_stamina": 100.0,
+        "min_sprint_stamina": 5.0,
+        "stamina_recovery": 15.0,
+        "stamina_depletion": 30.0,
+        "sprint_multiplier": 1.8,
+        "move_response": 14.0,
+        "move_decel": 20.0,
+        "sprint_response": 6.0,
+        "dash_cooldown": 2.5,
+        "dash_duration": 0.18,
+        "dash_speed": 18.0,
+        "dash_stamina_cost": 25.0,
+        "max_parries": 3,
+        "parry_duration": 1.0,
+        "melee_cooldown": 1.5,
+        "dodge_range_extra": 0.9,
+        "player_effects": {
+            "speed": {
+                "duration": 5.0,
+                "speed_multiplier": 1.5
+            }
+        },
+        "player_model": "models/smiley"
+    }
+}

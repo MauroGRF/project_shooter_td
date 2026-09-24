@@ -1,3 +1,11 @@
+from src.systems.physics import get_collision_half_extents
+
+# Combat ranges (world units). Named so tuning and tests do not hunt magic numbers.
+PROJECTILE_HIT_RANGE = 0.8
+# Small push so a resolved body does not re-overlap the tile next frame.
+TILE_PUSH_EPSILON = 0.01
+
+
 class CollisionSystem:
     def __init__(self, game):
         self.game = game
@@ -14,7 +22,7 @@ class CollisionSystem:
             self._check_melee_hitbox_collisions(melee_hitboxes, entities)
 
     def _check_projectile_entity_collisions(self, projectiles, entities):
-        hit_range = 0.8
+        hit_range = PROJECTILE_HIT_RANGE
         dodge_range = hit_range + self.dodge_range_extra
 
         for projectile in projectiles[:]:
@@ -96,6 +104,9 @@ class CollisionSystem:
                     break
 
     def _check_entity_tile_collisions(self, entities, tiles):
+        solid = [tile for tile in tiles if not tile.walkable]
+        if not solid:
+            return
         for entity in entities:
             if not entity.alive:
                 continue
@@ -103,30 +114,27 @@ class CollisionSystem:
                 continue
 
             pos = entity.node.getPos()
-            tile_size = entity.tile_size
+            hx, hy = get_collision_half_extents(entity)
 
-            for tile in tiles:
-                if tile.walkable:
-                    continue
-
+            for tile in solid:
                 tx = tile.node.getX()
                 ty = tile.node.getY()
-                half = tile_size * 0.5
+                th = getattr(tile, "tile_size", entity.tile_size) * 0.5
 
                 dx = pos.getX() - tx
                 dy = pos.getY() - ty
-                abs_dx = abs(dx)
-                abs_dy = abs(dy)
+                overlap_x = th + hx - abs(dx)
+                overlap_y = th + hy - abs(dy)
 
-                if abs_dx < half and abs_dy < half:
-                    if abs_dx > abs_dy:
-                        push = half - abs_dx + 0.01
+                if overlap_x > 0 and overlap_y > 0:
+                    if overlap_x < overlap_y:
+                        push = overlap_x + TILE_PUSH_EPSILON
                         if dx > 0:
                             entity.node.setX(entity.node.getX() + push)
                         else:
                             entity.node.setX(entity.node.getX() - push)
                     else:
-                        push = half - abs_dy + 0.01
+                        push = overlap_y + TILE_PUSH_EPSILON
                         if dy > 0:
                             entity.node.setY(entity.node.getY() + push)
                         else:

@@ -1,0 +1,13 @@
+{
+    "game": {
+        "tile_size": 1.0,
+        "gravity": -20.0,
+        "projectile_speed": 15.0,
+        "projectile_damage": 10,
+        "marker_height": 0.6,
+        "tile_model": "assets/models/tile_box.glb",
+        "wall_height": 1.0,
+        "floor_thickness": 0.1,
+        "floor_card_z": 0.005
+    }
+}

@@ -1,6 +1,8 @@
 from direct.showbase.ShowBase import ShowBase
 from panda3d.core import Point3, Vec3, Plane
 
+from src.core.warn_once import warn_once
+
 
 class InputManager:
     def __init__(self, game: ShowBase):
@@ -16,6 +18,7 @@ class InputManager:
         }
 
         self._setup_keybindings()
+        self._was_control_down = False
 
     def _key_event_names(self, base):
         """All event names a key can arrive as, depending on held modifiers
@@ -90,13 +93,13 @@ class InputManager:
     def _is_shift_down(self):
         try:
             return bool(self.game.getShift())
-        except Exception:
+        except AttributeError:
             return False
 
     def _is_control_down(self):
         try:
             return bool(self.game.getControl())
-        except Exception:
+        except AttributeError:
             return False
 
     def _set_key(self, key, value):
@@ -203,8 +206,11 @@ class InputManager:
             else:
                 if aim_dx != 0 or aim_dy != 0:
                     self.player.aim(aim_dx, aim_dy)
-        except Exception:
-            pass
+        except Exception as exc:
+            warn_once(
+                "input.aim",
+                f"[InputManager] mouse aim failed once: {exc!r}",
+            )
 
         if self.keys["space"] or self.keys["mouse1"]:
             gameplay = self.game.state_machine.get_state("gameplay")

@@ -16,6 +16,9 @@ TILE_LEGEND = {
     "wall": {"walkable": False, "damage": 0},
     "door": {"walkable": True, "damage": 0},
     "chest": {"walkable": False, "damage": 0},
+    "spawn_player": {"walkable": True, "damage": 0},
+    "spawn_enemy": {"walkable": True, "damage": 0},
+    "spawn_dog": {"walkable": True, "damage": 0},
 }
 
 
@@ -44,8 +47,16 @@ class LevelManager:
         return self._parse_grid(grid)
 
     def _parse_grid(self, grid):
+        if not grid or not grid[0]:
+            raise ValueError("Level grid is empty")
         height = len(grid)
-        width = len(grid[0]) if height > 0 else 0
+        width = len(grid[0])
+        for row_idx, row in enumerate(grid):
+            if len(row) != width:
+                raise ValueError(
+                    f"Irregular level grid: row {row_idx} has {len(row)} "
+                    f"cells, expected {width}"
+                )
 
         tiles = []
         player_spawn = None
@@ -55,7 +66,14 @@ class LevelManager:
         for row_idx, row in enumerate(grid):
             tile_row = []
             for col_idx, cell in enumerate(row):
-                tile_type = TILE_CHARS.get(cell, "floor")
+                if cell not in TILE_CHARS:
+                    print(
+                        f"[LevelManager] WARNING: unknown tile char "
+                        f"'{cell}' at ({col_idx}, {row_idx}); using floor"
+                    )
+                    tile_type = "floor"
+                else:
+                    tile_type = TILE_CHARS[cell]
 
                 tile_data = {
                     "type": tile_type,

@@ -19,6 +19,11 @@ class MenuState(StateBase):
             "WASD: Mover | Flechas: Apuntar | P: Pausa",
             0, -0.3, 0.05, Vec4(0.7, 0.7, 0.7, 1),
         )
+        error = kwargs.get("error")
+        if error:
+            self._make_text(
+                f"Error: {error}", 0, -0.55, 0.045, Vec4(1, 0.3, 0.3, 1),
+            )
 
         self.game.event_bus.subscribe("enter_pressed", self._on_start)
         self.game.event_bus.subscribe("escape_pressed", self._on_exit)
