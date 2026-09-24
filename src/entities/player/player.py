@@ -11,7 +11,10 @@ class Player(Character):
     MODEL = "models/smiley"
     MODEL_SCALE = 0.4
     MODEL_ROTATION = None
-    MODEL_OFFSET = None
+    # Smiley mesh spans z -1..1, so at scale 0.4 the feet sit at -0.4.
+    # Lift the origin so feet rest on the floor (z=0) instead of cutting
+    # through the floor cards.
+    MODEL_OFFSET = 0.4
     # Tight bounds of models/smiley at scale 0.4: 0.80 x 0.80.
     COLLISION_HALF_EXTENTS = (0.4, 0.4)
 
@@ -82,6 +85,7 @@ class Player(Character):
         # pickup economy
         self.coins = 0
         self.score = 0
+        self.keys = 0
 
         self._add_marker()
 
@@ -199,6 +203,16 @@ class Player(Character):
 
     def add_score(self, n=1):
         self.score += n
+
+    def add_key(self, n=1):
+        self.keys += n
+
+    def use_key(self):
+        """Consume one key from inventory. Returns True if a key was spent."""
+        if self.keys <= 0:
+            return False
+        self.keys -= 1
+        return True
 
     def reload_weapon(self, key=None):
         if key is None:

@@ -9,7 +9,9 @@ TILE_COLORS = {
     "wall": (0.55, 0.45, 0.35, 1.0),
     "floor": (0.3, 0.35, 0.25, 1.0),
     "door": (0.7, 0.6, 0.25, 1.0),
+    "door_open": (0.35, 0.55, 0.35, 1.0),
     "chest": (0.9, 0.75, 0.15, 1.0),
+    "chest_open": (0.55, 0.5, 0.3, 1.0),
     "barrier": (0.2, 0.2, 0.25, 1.0),
 }
 
@@ -88,6 +90,10 @@ class Tile(EntityBase):
         self.grid_y = tile_data["grid_y"]
         self.tile_size = tile_size
         self.texture = None
+        # Door/chest state: opened gates consume a key on entry; chests are
+        # opened by the player's interact action.
+        self.opened = False
+        self._visual_box = None
 
         old_node = self.node
         self.node = self._create_visual()
@@ -135,7 +141,7 @@ class Tile(EntityBase):
         cache = TileTextureCache.get_instance()
         self.texture = cache.get_texture(self.entity_type, self.game)
 
-        if self.entity_type in ("wall", "barrier"):
+        if self.entity_type in ("wall", "barrier", "door", "chest"):
             return self._create_wall_visual(vis, s, color)
 
         return self._create_floor_visual(vis, s, color)
@@ -156,6 +162,7 @@ class Tile(EntityBase):
         else:
             box.setColor(Vec4(color[0], color[1], color[2], 1))
 
+        self._visual_box = box
         return vis
 
     def _create_floor_visual(self, vis, s, color):
@@ -174,6 +181,34 @@ class Tile(EntityBase):
             card.setColor(Vec4(color[0], color[1], color[2], 1))
 
         return vis
+
+    def open(self):
+        """Mark this gate opened and swap its visual. Idempotent.
+
+        Used by both doors (key consumed by Character._is_walkable) and
+        chests (opened by Level via the interact action). Recolor + lower
+        the box so the gate reads as "open hatch".
+        """
+        if self.opened:
+            return
+        self.opened = True
+        self.walkable = True
+        if self._visual_box is None:
+            return
+        color_key = "door_open" if self.entity_type == "door" else "chest_open"
+        color = TILE_COLORS.get(color_key, TILE_COLORS.get(self.entity_type, (0.4, 0.4, 0.4, 1.0)))
+        try:
+            self._visual_box.setColor(Vec4(color[0], color[1], color[2], 1))
+            # Halve height and drop to floor so the opened gate reads
+            # as an open hatch instead of a wall.
+            wall_h = self._tile_cfg("wall_height") * 0.5
+            self._visual_box.setScale(self.tile_size, self.tile_size, wall_h)
+            self._visual_box.setPos(0, 0, wall_h / 2.0)
+        except Exception as exc:
+            warn_once(
+                f"tile.open.{self.entity_type}",
+                f"[Tile] open() recolor failed: {exc!r}",
+            )
 
     def destroy(self):
         EntityBase.destroy(self)

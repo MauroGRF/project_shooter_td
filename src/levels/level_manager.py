@@ -17,6 +17,7 @@ COLLECTABLE_CHARS = {
     "m": "score",
     "g": "weapon",
     "x": "exit",
+    "K": "key",
     "t": "trigger",
     "n": "next_level",
 }
@@ -24,7 +25,7 @@ COLLECTABLE_CHARS = {
 TILE_LEGEND = {
     "floor": {"walkable": True, "damage": 0},
     "wall": {"walkable": False, "damage": 0},
-    "door": {"walkable": True, "damage": 0},
+    "door": {"walkable": False, "damage": 0},
     "chest": {"walkable": False, "damage": 0},
     "barrier": {"walkable": False, "damage": 0},
     "spawn_player": {"walkable": True, "damage": 0},
